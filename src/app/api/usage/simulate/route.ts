@@ -10,7 +10,7 @@ const Body = v.variant('kind', [v.object({ kind: v.literal('amount'), cents: v.p
  *
  * Spends your own credits on paper, with no AI Gateway call (so it costs nothing), to show auto
  * top-up working: the balance drops, and the `topups` function tops it up on its next run.
- * Never counts toward the daily generation limit; never takes a balance below zero.
+ * Never counts toward the daily request limit; never takes a balance below zero.
  */
 export async function POST(request: Request) {
   const user = await getUser()

@@ -63,7 +63,7 @@ export function useControllableState<T>({ prop, defaultProp, onChange = () => {}
         }
       } else {
         // Notify the parent from the event handler instead of a useEffect,
-        // per https://react.dev/learn/you-might-not-need-an-effect — saves
+        // per https://react.dev/learn/you-might-not-need-an-effect, saves
         // the extra render. (Neon UI patch on the vendored source.)
         const value = isFunction(nextValue) ? nextValue(uncontrolledProp) : nextValue
         setUncontrolledProp(value)

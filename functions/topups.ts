@@ -31,7 +31,7 @@ app.post('/', async (c) => {
   if (!delivery.ok) return c.json({ error: delivery.error }, 401)
   if (delivery.invocation.trigger.type !== 'schedule') return c.json({ error: 'expected schedule' }, 400)
   if (!env.STRIPE_SECRET_KEY) return c.json({ error: 'STRIPE_SECRET_KEY is not set for this function' }, 500)
-  const stripe = new Stripe(env.STRIPE_SECRET_KEY, { appInfo: { name: 'tollbooth' } })
+  const stripe = new Stripe(env.STRIPE_SECRET_KEY, { appInfo: { name: 'bouncer' } })
 
   const promotionCodeId = await topupPromotionId(sql)
   const candidates = await findTopupCandidates(sql)

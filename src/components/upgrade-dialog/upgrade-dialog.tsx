@@ -15,7 +15,7 @@ export interface UpgradePlan {
   features: string[]
   /** One quiet line under the action, e.g. billing terms. */
   note?: string
-  /** Label after the price. Default "/ month"; e.g. "one-time". (Tollbooth addition.) */
+  /** Label after the price. Default "/ month"; e.g. "one-time". (Bouncer addition.) */
   period?: string
   /** Pre-discount price, drawn struck through before `price`. */
   compareAt?: number
@@ -46,20 +46,20 @@ export interface UpgradeDialogProps {
  *              (number large, cadence mono), then the
  *              checklist introduces itself one line at a
  *              time, 50ms apart, each check drawing in
- *  action      the CTA arrives already charged — neon fill
+ *  action      the CTA arrives already charged, neon fill
  *              and the house glow; this is the one place
  *              the color was always going
  *  processing  everything locks; the label shimmers
  *              ("Upgrading…") until the flight lands and
  *              the parent closes the dialog
  *  error       the description slot speaks the failure in
- *              destructive — same row, zero shift
+ *              destructive, same row, zero shift
  * ───────────────────────────────────────────────────────── */
 const FEATURE_STAGGER_MS = 50
 
 const RISE = 'fill-mode-backwards fade-in-0 slide-in-from-bottom-2 animate-in duration-500 motion-reduce:animate-none'
 
-/* The charged CTA speaks through color and the sweep alone — no glow. */
+/* The charged CTA speaks through color and the sweep alone, no glow. */
 const CTA_GLOW = ''
 
 const FeatureRow = ({ feature, index }: { feature: string; index: number }) => (

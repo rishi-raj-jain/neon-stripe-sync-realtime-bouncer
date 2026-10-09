@@ -6,7 +6,7 @@ out
 *.tsbuildinfo
 next-env.d.ts
 
-# env — `neon deploy` / `neon env pull` write Neon-managed vars into .env
+# env: `neon deploy` / `neon env pull` write Neon-managed vars into .env
 .env
 .env.*
 !.env.example

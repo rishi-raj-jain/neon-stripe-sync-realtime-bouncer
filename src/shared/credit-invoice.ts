@@ -1,3 +1,4 @@
+import { APP_TAG } from '@/shared/pricing'
 import type Stripe from 'stripe'
 
 /**
@@ -15,7 +16,7 @@ export async function createCreditInvoice(
   input: { customer: string; amountCents: number; promotionCodeId: string | null; paymentMethod?: string | null; key: string; metadata: Record<string, string> },
 ): Promise<Stripe.Invoice> {
   const { customer, amountCents, promotionCodeId, paymentMethod, key } = input
-  const metadata = { app: 'tollbooth', ...input.metadata, credits_cents: String(amountCents) }
+  const metadata = { app: APP_TAG, ...input.metadata, credits_cents: String(amountCents) }
 
   const invoice = await stripe.invoices.create(
     {
@@ -24,14 +25,14 @@ export async function createCreditInvoice(
       collection_method: 'charge_automatically',
       auto_advance: false,
       pending_invoice_items_behavior: 'exclude',
-      description: 'Tollbooth API credits',
+      description: 'Bouncer moderation credits',
       metadata,
       ...(promotionCodeId && { discounts: [{ promotion_code: promotionCodeId }] }),
       ...(paymentMethod && { default_payment_method: paymentMethod }),
     },
     { idempotencyKey: `${key}:invoice` },
   )
-  await stripe.invoiceItems.create({ customer, invoice: invoice.id, amount: amountCents, currency: 'usd', description: 'Tollbooth API credits', metadata }, { idempotencyKey: `${key}:item` })
+  await stripe.invoiceItems.create({ customer, invoice: invoice.id, amount: amountCents, currency: 'usd', description: 'Bouncer moderation credits', metadata }, { idempotencyKey: `${key}:item` })
   const finalized = await stripe.invoices.finalizeInvoice(invoice.id, { auto_advance: false }, { idempotencyKey: `${key}:finalize` })
   if (finalized.status === 'paid') return finalized
   return stripe.invoices.pay(invoice.id, { off_session: true }, { idempotencyKey: `${key}:pay` })

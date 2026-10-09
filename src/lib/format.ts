@@ -15,4 +15,4 @@ export const compact = (value: number) => value.toLocaleString('en-US', { notati
 /** Margin as a share of revenue; null when there was no revenue. */
 export const marginPercent = (revenueMicros: number, costMicros: number) => (revenueMicros > 0 ? ((revenueMicros - costMicros) / revenueMicros) * 100 : null)
 
-export const percent = (value: number | null) => (value === null ? '—' : `${value.toFixed(0)}%`)
+export const percent = (value: number | null) => (value === null ? 'n/a' : `${value.toFixed(0)}%`)

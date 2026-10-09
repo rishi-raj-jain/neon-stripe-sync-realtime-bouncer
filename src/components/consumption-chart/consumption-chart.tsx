@@ -20,7 +20,7 @@ export interface ConsumptionSeries {
   color?: string
   /**
    * Unit of the values, e.g. "CU-hrs" or "GB-mo". Series that don't share
-   * a unit are never stacked or summed together — CU-hours plus GB-months
+   * a unit are never stacked or summed together, CU-hours plus GB-months
    * is not a quantity.
    */
   unit?: string
@@ -79,7 +79,7 @@ export type ConsumptionChartProps = Omit<ComponentProps<'section'>, 'children' |
  *  color     one hue, five steps of lightness, and a
  *            hairline of --card between stacked bands.
  *            Bands separate by value and by that gap, which
- *            survives at any size — texture did not
+ *            survives at any size, texture did not
  *  totals    the header sums per unit, never across them.
  *            CU-hours and GB-months don't add up, and one
  *            number pretending they do is worse than none

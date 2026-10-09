@@ -305,7 +305,7 @@
 
 /*
  * Status breathe: a slow inhale/exhale for in-flight status dots. The dot
- * dims and swells a soft glow on a 2.6s ease-in-out cycle — alive, not
+ * dims and swells a soft glow on a 2.6s ease-in-out cycle, alive, not
  * blinking. Static and fully lit under reduced motion.
  */
 @keyframes neon-status-breathe {
@@ -336,7 +336,7 @@
  * currentColor so the status hue drives it. The base layer is a smooth
  * color fade; ::after dithers it with the same fractal noise MetricCard
  * draws over its trend (baseFrequency 0.7, octaves 2, seed 7). Gradient
- * first, grain as texture — never a static field.
+ * first, grain as texture, never a static field.
  */
 .neon-card-wash {
   background: linear-gradient(to top, color-mix(in oklch, currentColor 70%, transparent), transparent 85%);
@@ -390,7 +390,7 @@
 }
 
 /*
- * Stripe march: the EmptyState hairline stripes on the move — a slow
+ * Stripe march: the EmptyState hairline stripes on the move, a slow
  * barber-pole for in-flight actions. Static under reduced motion.
  */
 @keyframes neon-stripe-march {
@@ -470,7 +470,7 @@
 /*
  * Hold shake: the destructive hold trembles, and the tremble grows as
  * the fill approaches commitment. Amplitude rides a registered custom
- * property so it can transition smoothly from 0 over the whole hold —
+ * property so it can transition smoothly from 0 over the whole hold,
  * barely a shiver at the start, unmistakable by the end. The jitter
  * mixes axes and never repeats a direction twice, so it reads as
  * strain rather than a metronome. Off entirely under reduced motion.

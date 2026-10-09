@@ -26,10 +26,10 @@ export type EmptyStateProps = Omit<ComponentProps<'div'>, 'title'> & {
  * An intentional empty state, not an absence. Three moves
  * from the Neon identity mark the space as "waiting":
  *
- *  texture   faint 45° hairline stripes wash the panel —
+ *  texture   faint 45° hairline stripes wash the panel,
  *            the same fill MetricCard draws under trends,
  *            here reading as unclaimed ground
- *  mark      the Neon mark faded to a watermark — the
+ *  mark      the Neon mark faded to a watermark, the
  *            brand holding the space open
  *  type      one foreground line, one muted line, action
  *            last; everything else stays quiet

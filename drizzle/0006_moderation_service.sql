@@ -1,15 +1,37 @@
-CREATE TABLE "app"."simulated_spend" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"account_id" uuid NOT NULL,
-	"amount_micros" bigint NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "simulated_spend_amount_check" CHECK ("app"."simulated_spend"."amount_micros" > 0)
+-- The API stops reselling tokens and sells a service: content moderation, priced per item.
+-- The ledger keeps the token counts (what each call cost us) and gains what was sold (units).
+CREATE TABLE "app"."service_prices" (
+	"service" text PRIMARY KEY NOT NULL,
+	"unit_price_micros" bigint NOT NULL,
+	"active" boolean DEFAULT true NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "service_prices_unit_price_check" CHECK ("app"."service_prices"."unit_price_micros" >= 0)
 );
 --> statement-breakpoint
-ALTER TABLE "app"."simulated_spend" ADD CONSTRAINT "simulated_spend_account_id_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "app"."accounts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "simulated_spend_account_created_idx" ON "app"."simulated_spend" USING btree ("account_id","created_at");--> statement-breakpoint
+-- Every call recorded so far was a chat completion billed per token: label those rows, then
+-- make new rows say what they sold.
+ALTER TABLE "app"."usage_events" ADD COLUMN "service" text DEFAULT 'chat' NOT NULL;--> statement-breakpoint
+ALTER TABLE "app"."usage_events" ALTER COLUMN "service" DROP DEFAULT;--> statement-breakpoint
+ALTER TABLE "app"."usage_events" ADD COLUMN "units" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 
--- The wallet now subtracts simulated usage too (same columns, so the view is replaced in place).
+-- What we CHARGE is now units × the service's unit price (no more per-token rates). Past rows
+-- keep the price_micros they were written with.
+DROP FUNCTION IF EXISTS app.price_micros(text, bigint, bigint, bigint, bigint);--> statement-breakpoint
+CREATE FUNCTION app.price_micros(p_service text, p_units bigint) RETURNS bigint
+LANGUAGE sql STABLE AS $$
+  select coalesce((
+    select greatest(p_units, 0) * p.unit_price_micros
+      from app.service_prices p
+     where p.service = p_service
+  ), 0)
+$$;--> statement-breakpoint
+
+-- Launch price: $1 per 1,000 items (1,000 micros per unit of up to 2,000 characters). One item
+-- costs us about 70 micros in tokens on gpt-oss-20b alone, under 40 each in a batch of eight.
+INSERT INTO "app"."service_prices" ("service", "unit_price_micros") VALUES ('moderate', 1000);--> statement-breakpoint
+
+-- The wallet again (same columns, so the view is replaced in place): the simulated-spend comment
+-- now says what the app sells. Otherwise unchanged from 0005.
 CREATE OR REPLACE VIEW app.balances AS
   with purchased as (
     select a.id as account_id, sum((ch.amount - ch.amount_refunded) * 10000)::bigint as micros
@@ -45,7 +67,7 @@ CREATE OR REPLACE VIEW app.balances AS
       from (
         select u.account_id, u.price_micros as micros from app.usage_events u
         union all
-        -- Simulated usage (dashboard demo): spends credits with no AI Gateway call behind it.
+        -- Simulated usage (dashboard demo): spends credits with no moderation behind it.
         select d.account_id, d.amount_micros from app.simulated_spend d
       ) all_spend
      group by account_id

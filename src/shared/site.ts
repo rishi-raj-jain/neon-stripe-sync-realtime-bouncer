@@ -1,5 +1,5 @@
 export const SITE = {
-  name: 'Tollbooth',
-  tagline: 'Sell an LLM API, metered per token.',
-  githubUrl: 'https://github.com/rishi-raj-jain/neon-stripe-sync-realtime-tollbooth',
+  name: 'Bouncer',
+  tagline: 'A content moderation API, billed per item.',
+  githubUrl: 'https://github.com/rishi-raj-jain/neon-stripe-sync-realtime-bouncer',
 } as const

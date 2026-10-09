@@ -5,7 +5,7 @@ import { defineConfig } from '@neon/config/v1'
 import { DEFAULT_MODEL } from './src/shared/pricing'
 
 /**
- * Infrastructure for Tollbooth, applied with `neon deploy`.
+ * Infrastructure for Bouncer, applied with `neon deploy`.
  *
  * Project region: AWS US East (Ohio) / aws-us-east-2, next to Vercel's cle1, where
  * Functions and AI Gateway are available.
@@ -18,15 +18,15 @@ const apiDomains = process.env.API_CUSTOM_DOMAIN ? [process.env.API_CUSTOM_DOMAI
 export default defineConfig({
   // Managed Better Auth for the dashboard: users + sessions live in the `neon_auth` schema.
   auth: true,
-  // The models we resell. No provider keys: the gateway token is injected per branch.
+  // The model behind the moderation service. No provider keys: the gateway token is injected per branch.
   aiGateway: true,
   functions: {
     // Slugs must match ^[a-z0-9]{1,20}$ and can't change after the first deploy.
     api: {
-      name: 'Metered OpenAI-compatible API',
+      name: 'Moderation API, billed per item',
       source: './functions/api.ts',
       env: { DEFAULT_MODEL },
-      // e.g. API_CUSTOM_DOMAIN=api.tollbooth.dev → customers call https://api.tollbooth.dev/v1/…
+      // e.g. API_CUSTOM_DOMAIN=api.bouncer.dev → customers call https://api.bouncer.dev/v1/moderate
       customDomains: apiDomains,
       dev: { port: 8787 },
     },

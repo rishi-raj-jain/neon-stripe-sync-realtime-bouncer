@@ -5,7 +5,7 @@ import 'server-only'
  * isn't one Neon offers. So a username maps to a placeholder address on a reserved,
  * non-routable TLD. Nothing is ever sent to it (email verification is off on the branch).
  */
-const USERNAME_DOMAIN = 'users.tollbooth.invalid'
+const USERNAME_DOMAIN = 'users.bouncer.invalid'
 
 export const usernameToEmail = (username: string) => `${username.toLowerCase()}@${USERNAME_DOMAIN}`
 

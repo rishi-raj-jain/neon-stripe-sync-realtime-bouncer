@@ -425,7 +425,7 @@ const AnimatedHeight = ({ children }: { children: ReactNode }) => {
 const EmptyState = ({ message, showHint }: { message: string; showHint: boolean }) => (
   <div className="rounded-md border border-dashed border-border/60 bg-background px-3 py-6 text-center">
     <p className="text-xs text-muted-foreground">{message}</p>
-    {showHint ? <p className="mt-1 text-[11px] text-muted-foreground/60">Create one to call the API.</p> : null /* (Tollbooth edit: product-neutral hint) */}
+    {showHint ? <p className="mt-1 text-[11px] text-muted-foreground/60">Create one to call the API.</p> : null /* (Bouncer edit: product-neutral hint) */}
   </div>
 )
 

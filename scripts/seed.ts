@@ -1,6 +1,6 @@
 import '@dotenvx/dotenvx/config'
 
-import { AUTO_PROMOTION_CODE, CREDIT_PACKS } from '@/shared/pricing'
+import { APP_TAG, AUTO_PROMOTION_CODE, CREDIT_PACKS } from '@/shared/pricing'
 import Stripe from 'stripe'
 import * as v from 'valibot'
 
@@ -21,7 +21,7 @@ const env = v.parse(
   process.env,
 )
 
-const stripe = new Stripe(env.STRIPE_SECRET_KEY, { appInfo: { name: 'tollbooth-seed' } })
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, { appInfo: { name: 'bouncer-seed' } })
 
 async function seedCatalog() {
   const lookupKeys = Object.values(CREDIT_PACKS).map((pack) => pack.lookupKey)
@@ -30,7 +30,7 @@ async function seedCatalog() {
   const missing = Object.values(CREDIT_PACKS).filter((pack) => !have.has(pack.lookupKey))
   if (missing.length === 0) return console.log('✓ Stripe prices already exist')
 
-  const product = await stripe.products.create({ name: 'Tollbooth API credits', metadata: { app: 'tollbooth' } }, { idempotencyKey: 'tollbooth-seed-product' })
+  const product = await stripe.products.create({ name: 'Bouncer moderation credits', metadata: { app: APP_TAG } }, { idempotencyKey: 'bouncer-seed-product' })
   for (const pack of missing) {
     await stripe.prices.create({ product: product.id, currency: 'usd', unit_amount: pack.cents, lookup_key: pack.lookupKey, nickname: `${pack.label} credits` })
   }
@@ -43,8 +43,8 @@ async function seedPromotionCode() {
   const { data: existing } = await stripe.promotionCodes.list({ code: AUTO_PROMOTION_CODE, active: true, limit: 1 })
   if (existing[0]) return console.log(`✓ Promotion code ${AUTO_PROMOTION_CODE} already exists`)
 
-  const coupon = await stripe.coupons.create({ percent_off: 100, duration: 'forever', name: 'Tollbooth: every purchase free' }, { idempotencyKey: 'tollbooth-seed-coupon' })
-  await stripe.promotionCodes.create({ code: AUTO_PROMOTION_CODE, promotion: { type: 'coupon', coupon: coupon.id } }, { idempotencyKey: 'tollbooth-seed-promo' })
+  const coupon = await stripe.coupons.create({ percent_off: 100, duration: 'forever', name: 'Bouncer: every purchase free' }, { idempotencyKey: 'bouncer-seed-coupon' })
+  await stripe.promotionCodes.create({ code: AUTO_PROMOTION_CODE, promotion: { type: 'coupon', coupon: coupon.id } }, { idempotencyKey: 'bouncer-seed-promo' })
   console.log(`✓ Created promotion code ${AUTO_PROMOTION_CODE} (100% off)`)
 }
 

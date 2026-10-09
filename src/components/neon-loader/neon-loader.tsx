@@ -146,7 +146,7 @@ export const NeonLoader = ({ className, decorative = false, duration = LOADER_TI
     }
 
     const draw = (now: number) => {
-      // Skip canvas work while hidden — keep the loop alive, drop the cost.
+      // Skip canvas work while hidden, keep the loop alive, drop the cost.
       if (!(canvas.checkVisibility?.() ?? true)) {
         frame = requestAnimationFrame(draw)
         return

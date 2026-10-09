@@ -7,8 +7,9 @@ import { bigint, boolean, check, index, integer, jsonb, numeric, pgSchema, small
  *   stripe.*     Stripe Data Pipeline (read-only for us, see ./stripe.ts)
  *   app.*        this file (tables, via drizzle-kit) + drizzle/0001_* (SQL functions, views)
  *
- * Money is integer micro-dollars (`*_micros`, 1e-6 USD). Rates are USD per million tokens,
- * so tokens × rate = micros exactly.
+ * Money is integer micro-dollars (`*_micros`, 1e-6 USD). Customers pay per unit of work
+ * (app.service_prices); what the tokens cost us is USD per million tokens (app.model_costs), so
+ * tokens × rate = micros exactly.
  */
 export const app = pgSchema('app')
 
@@ -52,18 +53,19 @@ export const apiKeys = app.table(
 )
 
 /**
- * What we CHARGE per model. Reasoning tokens get their own rate because they're the part of
- * the output a customer never sees, and the easiest to misprice.
+ * What we CHARGE: a price per unit of work, per service (`moderate`: one item of up to
+ * CHARS_PER_UNIT characters, see src/shared/pricing.ts). Never per token.
  */
-export const modelRates = app.table('model_rates', {
-  model: text('model').primaryKey(),
-  inputUsdPerMtok: usdPerMillionTokens('input_usd_per_mtok').notNull(),
-  cachedInputUsdPerMtok: usdPerMillionTokens('cached_input_usd_per_mtok').notNull(),
-  outputUsdPerMtok: usdPerMillionTokens('output_usd_per_mtok').notNull(),
-  reasoningUsdPerMtok: usdPerMillionTokens('reasoning_usd_per_mtok').notNull(),
-  active: boolean('active').notNull().default(true),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const servicePrices = app.table(
+  'service_prices',
+  {
+    service: text('service').primaryKey(),
+    unitPriceMicros: bigint('unit_price_micros', { mode: 'number' }).notNull(),
+    active: boolean('active').notNull().default(true),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check('service_prices_unit_price_check', sql`${t.unitPriceMicros} >= 0`)],
+)
 
 /** What AI Gateway charges US per model (provider list price). Reasoning bills as output. */
 export const modelCosts = app.table('model_costs', {
@@ -74,9 +76,10 @@ export const modelCosts = app.table('model_costs', {
 })
 
 /**
- * The usage ledger: one row per billed API call, written by the `api` function. Price and cost
- * are computed in SQL at write time (app.price_micros / app.cost_micros) and never change, so
- * new rates only ever apply to future calls.
+ * The usage ledger: one row per API call, written by the `api` function. The price is units ×
+ * the service's unit price, the cost is the tokens the call used; both are computed in SQL at
+ * write time (app.price_micros / app.cost_micros) and never change, so new prices only ever
+ * apply to future calls. A call whose output failed validation has 0 units: never charged.
  */
 export const usageEvents = app.table(
   'usage_events',
@@ -86,6 +89,11 @@ export const usageEvents = app.table(
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
     apiKeyId: uuid('api_key_id').references(() => apiKeys.id, { onDelete: 'set null' }),
+    /** What was sold (`moderate`). Rows from before the service was per item say `chat`. */
+    service: text('service').notNull(),
+    /** Units billed: items checked, longer items counted once per started CHARS_PER_UNIT. */
+    units: integer('units').notNull().default(0),
+    /** The model that did the work: what the tokens below cost us. */
     model: text('model').notNull(),
     /** Prompt tokens, including the cached ones. */
     inputTokens: integer('input_tokens').notNull(),
@@ -162,4 +170,4 @@ export const balances = app
   .existing()
 
 export type Account = typeof accounts.$inferSelect
-export type ModelRate = typeof modelRates.$inferSelect
+export type ServicePrice = typeof servicePrices.$inferSelect

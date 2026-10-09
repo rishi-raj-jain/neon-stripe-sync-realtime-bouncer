@@ -5,7 +5,6 @@ import { TypeIn } from '@/components/site/type-in'
 import { buttonVariants } from '@/components/ui/button'
 import { getUser } from '@/lib/auth/server'
 import { cn } from '@/lib/utils'
-import { DEFAULT_MODEL } from '@/shared/pricing'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -26,9 +25,10 @@ export default async function Home() {
       {/* Hero diptych: title + lede left, a real request/response right. */}
       <section className="page-frame grid items-center gap-(--space-xl) py-(--space-2xl) lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-(--space-2xl) lg:py-(--space-3xl)">
         <div className="flex min-w-0 flex-col gap-(--space-lg)">
-          <h1 className="max-w-[14ch] text-(length:--text-display) leading-[1.02] tracking-[-0.035em]">Sell an LLM API by the token.</h1>
+          <h1 className="max-w-[14ch] text-(length:--text-display) leading-[1.02] tracking-[-0.035em]">Content moderation, billed per item.</h1>
           <p className="max-w-[46ch] text-[1.0625rem] leading-relaxed">
-            An OpenAI-compatible endpoint on a Neon Function. Customers prepay through Stripe, every call is a ledger row priced in SQL, and the balance is a view over synced charges. No webhooks anywhere.
+            Send text, get back allow, review or block with a score per category. Customers prepay through Stripe, every request is a ledger row priced in SQL, and the balance is a view over synced charges. No webhooks
+            anywhere.
           </p>
           <div className="flex flex-wrap items-center gap-x-(--space-lg) gap-y-(--space-sm)">
             <Link href={user ? '/dashboard' : '/auth'} className={primary}>
@@ -42,27 +42,24 @@ export default async function Home() {
 
         <Reveal className="flex min-w-0 flex-col gap-(--space-sm)">
           <CodeCard label="request">
-            <Key>POST</Key> <TypeIn text="/v1/chat/completions" />
+            <Key>POST</Key> <TypeIn text="/v1/moderate" />
             {'\n'}
-            <Dim>Authorization: Bearer tb_••••••••</Dim>
+            <Dim>Authorization: Bearer bnc_••••••••</Dim>
             {'\n\n'}
             {'{ '}
-            <Key>&quot;model&quot;</Key>: &quot;{DEFAULT_MODEL}&quot;,{'\n  '}
-            <Key>&quot;messages&quot;</Key>: [{'{ '}&quot;role&quot;: &quot;user&quot;,{'\n                 '}&quot;content&quot;: &quot;Say hi in 3 words&quot; {'}'}],{'\n  '}
-            <Key>&quot;reasoning_effort&quot;</Key>: &quot;high&quot; {'}'}
+            <Key>&quot;input&quot;</Key>: [{'\n    '}&quot;Great write-up, thanks!&quot;,{'\n    '}&quot;You are an idiot.&quot; ] {'}'}
           </CodeCard>
-          <CodeCard label={`response · x-tollbooth-model: ${DEFAULT_MODEL}`} status="200 OK">
-            <Key>&quot;content&quot;</Key>: &quot;Hello there buddy.&quot;,{'\n'}
-            <Key>&quot;usage&quot;</Key>: {'{'}
-            {'\n  '}
-            <Key>&quot;prompt_tokens&quot;</Key>: 107,{'\n  '}
-            <Key>&quot;completion_tokens&quot;</Key>: 274,{'\n  '}
-            <Key>&quot;prompt_tokens_details&quot;</Key>: {'{ '}
-            <Key>&quot;cached_tokens&quot;</Key>: 32 {'}'}
+          <CodeCard label="response · x-bouncer-units: 2" status="200 OK">
+            <Key>&quot;results&quot;</Key>: [{'\n  '}
+            {'{ '}
+            <Key>&quot;verdict&quot;</Key>: &quot;allow&quot;, <Key>&quot;flagged&quot;</Key>: [] {'}'},{'\n  '}
+            {'{ '}
+            <Key>&quot;verdict&quot;</Key>: &quot;block&quot;, <Key>&quot;flagged&quot;</Key>: [&quot;harassment&quot;],{'\n    '}
+            <Key>&quot;reason&quot;</Key>: &quot;Harassing insult.&quot; {'}'} ],{'\n'}
+            <Key>&quot;usage&quot;</Key>: {'{ '}
+            <Key>&quot;items&quot;</Key>: 2, <Key>&quot;charge_usd&quot;</Key>: 0.002 {'}'}
             {'\n'}
-            {'}'}
-            {'\n'}
-            <Dim>{'// 274 output tokens, 3 words of answer'}</Dim>
+            <Dim>{'// 2 items, $0.001 each, whatever it took to score them'}</Dim>
           </CodeCard>
         </Reveal>
       </section>
@@ -119,7 +116,7 @@ export default async function Home() {
               {
                 by: 'neon',
                 title: 'Money out',
-                steps: ['the api function forwards to Neon AI Gateway', 'writes one ledger row per call', 'priced in SQL by app.price_micros()'],
+                steps: ['the api function scores every item in one AI Gateway call', 'checks the result, then writes one ledger row', 'priced per item in SQL by app.price_micros()'],
               },
             ].map((flow) => (
               <div key={flow.title} className="grid gap-(--space-sm) border-t border-(--color-graphite-rule) py-(--space-lg) sm:grid-cols-[9rem_minmax(0,1fr)]">

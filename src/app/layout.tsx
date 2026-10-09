@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   metadataBase: new URL(env.APP_URL),
   title: SITE.name,
-  description: 'Sell an LLM API, metered per token: Neon Functions, AI Gateway and Stripe synced to Postgres, with no webhooks.',
+  description: 'A content moderation API, billed per item: Neon Functions, AI Gateway and Stripe synced to Postgres, with no webhooks.',
   twitter: { card: 'summary_large_image' },
 }
 
@@ -39,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Hallmark Ft5 · Statement: one closing sentence, the meta row muted beneath it. */}
         <footer className="border-t">
           <div className="page-frame flex flex-col gap-(--space-xl) pt-(--space-2xl) pb-(--space-lg)">
-            <p className="max-w-[28ch] font-heading text-[clamp(1.75rem,2.5vw+1rem,2.75rem)] leading-[1.08] font-bold tracking-[-0.03em] text-(--color-ink)">Every token metered. Every balance a view.</p>
+            <p className="max-w-[28ch] font-heading text-[clamp(1.75rem,2.5vw+1rem,2.75rem)] leading-[1.08] font-bold tracking-[-0.03em] text-(--color-ink)">Every item checked. Every balance a view.</p>
             <div className="flex flex-col gap-3 border-t pt-(--space-md) text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
               <span className="flex items-center gap-2 font-heading font-bold whitespace-nowrap text-(--color-ink)">
                 <AppLogo className="size-4" />

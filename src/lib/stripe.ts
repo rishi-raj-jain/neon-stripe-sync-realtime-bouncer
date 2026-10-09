@@ -6,6 +6,7 @@ import { stripeCustomers, stripePrices, stripePromotionCodes } from '@/db/schema
 import { env } from '@/env'
 import type { SessionUser } from '@/lib/auth/server'
 import { isPlaceholderEmail, usernameToEmail } from '@/lib/auth/username'
+import { APP_TAG } from '@/shared/pricing'
 import { and, desc, eq } from 'drizzle-orm'
 import Stripe from 'stripe'
 
@@ -13,7 +14,7 @@ import Stripe from 'stripe'
  * Stripe is only ever *written* through the API. Everything we *read* comes from the
  * synced `stripe.*` tables in Neon, so the app has no webhook endpoint at all.
  */
-export const stripe = new Stripe(env.STRIPE_SECRET_KEY, { appInfo: { name: 'tollbooth' } })
+export const stripe = new Stripe(env.STRIPE_SECRET_KEY, { appInfo: { name: 'bouncer' } })
 
 /**
  * The account's Stripe customer, created up front and stored on app.accounts, so the wallet
@@ -35,7 +36,7 @@ export async function ensureStripeCustomer(account: Account, user: SessionUser):
   }
 
   const customer = await stripe.customers.create(
-    { name: account.label, ...(email && { email }), metadata: { app: 'tollbooth', account_id: account.id } },
+    { name: account.label, ...(email && { email }), metadata: { app: APP_TAG, account_id: account.id } },
     // Two tabs racing here get the same customer back instead of two customers.
     { idempotencyKey: `customer:${account.id}:${account.stripeCustomerId ?? 'new'}` },
   )

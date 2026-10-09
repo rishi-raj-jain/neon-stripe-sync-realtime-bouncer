@@ -43,6 +43,27 @@
       "when": 1791555143263,
       "tag": "0005_simulated_spend",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791561075825,
+      "tag": "0006_moderation_service",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791561092555,
+      "tag": "0007_drop_model_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791561958391,
+      "tag": "0008_rebrand_to_bouncer",
+      "breakpoints": true
     }
   ]
 }

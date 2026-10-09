@@ -2,7 +2,7 @@ import { env } from '@/env'
 import { ensureAccount } from '@/lib/accounts'
 import { getUser, unauthorized } from '@/lib/auth/server'
 import { ensureStripeCustomer, resolvePriceId, resolvePromotionCodeId, stripe } from '@/lib/stripe'
-import { AUTO_PROMOTION_CODE, CREDIT_PACKS, type PackId } from '@/shared/pricing'
+import { APP_TAG, AUTO_PROMOTION_CODE, CREDIT_PACKS, type PackId } from '@/shared/pricing'
 import * as v from 'valibot'
 
 const Body = v.object({ pack: v.picklist(Object.keys(CREDIT_PACKS) as [PackId, ...PackId[]]) })
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   const account = await ensureAccount(user)
   const [customer, price, promotionCode] = await Promise.all([ensureStripeCustomer(account, user), resolvePriceId(pack.lookupKey), AUTO_PROMOTION_CODE ? resolvePromotionCodeId(AUTO_PROMOTION_CODE) : null])
-  const metadata = { app: 'tollbooth', account_id: account.id, kind: 'credits', pack: parsed.output.pack, credits_cents: String(pack.cents) }
+  const metadata = { app: APP_TAG, account_id: account.id, kind: 'credits', pack: parsed.output.pack, credits_cents: String(pack.cents) }
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',

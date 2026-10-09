@@ -1,10 +1,10 @@
 import 'server-only'
 
 import { db, sql as client } from '@/db/client'
-import { accounts, apiKeys, balances, simulatedSpend, topups, usageEvents, type Account } from '@/db/schema/app'
+import { accounts, apiKeys, balances, servicePrices, simulatedSpend, topups, usageEvents, type Account } from '@/db/schema/app'
 import { stripeCharges, stripeCheckoutSessions, stripeInvoices } from '@/db/schema/stripe'
 import { stripe } from '@/lib/stripe'
-import { AUTO_PROMOTION_CODE, DAILY_REQUEST_LIMIT } from '@/shared/pricing'
+import { APP_TAG, AUTO_PROMOTION_CODE, CHARS_PER_UNIT, DAILY_REQUEST_LIMIT, MODERATION_SERVICE } from '@/shared/pricing'
 import { findTopupCandidates, manualTopupKey, topUp, topupPromotionId, type TopupResult } from '@/shared/topups'
 import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 
@@ -69,7 +69,7 @@ const freeInvoicesQuery = (customerId: string) =>
       created: stripeInvoices.created,
     })
     .from(stripeInvoices)
-    .where(and(eq(stripeInvoices.customer, customerId), eq(stripeInvoices.status, 'paid'), eq(stripeInvoices.total, 0), sql`${stripeInvoices.metadata} ->> 'app' = 'tollbooth'`))
+    .where(and(eq(stripeInvoices.customer, customerId), eq(stripeInvoices.status, 'paid'), eq(stripeInvoices.total, 0), sql`${stripeInvoices.metadata} ->> 'app' = ${APP_TAG}`))
     .orderBy(desc(stripeInvoices.created))
     .limit(10)
 
@@ -88,13 +88,13 @@ const keysQuery = (accountId: string) =>
     .where(and(eq(apiKeys.accountId, accountId), isNull(apiKeys.revokedAt)))
     .orderBy(desc(apiKeys.createdAt))
 
-/** Spend per day for the last 30 days. */
+/** Spend and items checked per day for the last 30 days. */
 const dailyQuery = (accountId: string) =>
   db
     .select({
       day: sql<string>`to_char(date_trunc('day', ${usageEvents.createdAt}), 'YYYY-MM-DD')`,
       requests: sql<number>`count(*)::int`,
-      tokens: sql<number>`sum(${usageEvents.inputTokens} + ${usageEvents.outputTokens})::bigint`,
+      units: sql<number>`sum(${usageEvents.units})::bigint`,
       spentMicros: sql<number>`sum(${usageEvents.priceMicros})::bigint`,
     })
     .from(usageEvents)
@@ -122,7 +122,7 @@ const simulatedRecentQuery = (accountId: string) =>
     .orderBy(desc(simulatedSpend.createdAt))
     .limit(15)
 
-/** The demo's daily limit: billed calls in the last 24 hours, and when the oldest ages out. */
+/** The demo's daily limit: requests in the last 24 hours, and when the oldest ages out. */
 const limitQuery = (accountId: string) =>
   db
     .select({ used: sql<number>`count(*)::int`, oldest: sql<string | null>`min(${usageEvents.createdAt})` })
@@ -133,10 +133,9 @@ const recentQuery = (accountId: string) =>
   db
     .select({
       id: usageEvents.id,
-      model: usageEvents.model,
-      inputTokens: usageEvents.inputTokens,
-      outputTokens: usageEvents.outputTokens,
-      reasoningTokens: usageEvents.reasoningTokens,
+      service: usageEvents.service,
+      units: usageEvents.units,
+      status: usageEvents.status,
       priceMicros: usageEvents.priceMicros,
       latencyMs: usageEvents.latencyMs,
       createdAt: usageEvents.createdAt,
@@ -146,12 +145,20 @@ const recentQuery = (accountId: string) =>
     .orderBy(desc(usageEvents.createdAt))
     .limit(15)
 
+/** What one unit of moderation costs right now (what the dashboard quotes). */
+const priceQuery = () =>
+  db
+    .select({ unitPriceMicros: servicePrices.unitPriceMicros })
+    .from(servicePrices)
+    .where(and(eq(servicePrices.service, MODERATION_SERVICE), eq(servicePrices.active, true)))
+    .limit(1)
+
 const n = (value: unknown) => Number(value ?? 0)
 
 export async function getDashboard(account: Account) {
   // Without a Stripe customer there are no charges; query an id that can't match.
   const customerId = account.stripeCustomerId ?? ''
-  const [[balance], charges, freeOrders, freeInvoices, recentTopups, keys, daily, recent, [today], simulatedDaily, simulatedRecent] = await db.batch([
+  const [[balance], charges, freeOrders, freeInvoices, recentTopups, keys, daily, recent, [today], simulatedDaily, simulatedRecent, [price]] = await db.batch([
     balanceQuery(account.id),
     chargesQuery(customerId),
     freeOrdersQuery(customerId),
@@ -163,6 +170,7 @@ export async function getDashboard(account: Account) {
     limitQuery(account.id),
     simulatedDailyQuery(account.id),
     simulatedRecentQuery(account.id),
+    priceQuery(),
   ])
 
   // The card on file: whatever the latest successful charge was paid with (saved off-session).
@@ -173,6 +181,7 @@ export async function getDashboard(account: Account) {
       spentMicros: n(balance?.spentMicros),
       balanceMicros: n(balance?.balanceMicros),
     },
+    pricing: { unitPriceMicros: n(price?.unitPriceMicros), charsPerUnit: CHARS_PER_UNIT },
     card: lastPaid?.card?.last4 ? { brand: lastPaid.card.brand ?? 'card', last4: lastPaid.card.last4 } : null,
     // Every way credits arrive, newest first: paid charges, free Checkout orders, free top-ups.
     purchases: [
@@ -223,10 +232,9 @@ export async function getDashboard(account: Account) {
         ...recent.map((event) => ({ ...event, priceMicros: n(event.priceMicros), simulated: false, createdAt: event.createdAt.toISOString() })),
         ...simulatedRecent.map((entry) => ({
           id: entry.id,
-          model: 'simulated',
-          inputTokens: 0,
-          outputTokens: 0,
-          reasoningTokens: 0,
+          service: 'simulated',
+          units: 0,
+          status: 200,
           priceMicros: n(entry.amountMicros),
           latencyMs: null,
           simulated: true,
@@ -255,11 +263,11 @@ export async function updateAutoTopup(accountId: string, settings: { enabled: bo
 }
 
 /** One row per day with real and simulated spend side by side. */
-function mergeDaily(real: { day: string; requests: number; tokens: number; spentMicros: number }[], simulated: { day: string; spentMicros: number }[]) {
-  const days = new Map<string, { day: string; requests: number; tokens: number; spentMicros: number; simulatedMicros: number }>()
-  for (const day of real) days.set(day.day, { day: day.day, requests: n(day.requests), tokens: n(day.tokens), spentMicros: n(day.spentMicros), simulatedMicros: 0 })
+function mergeDaily(real: { day: string; requests: number; units: number; spentMicros: number }[], simulated: { day: string; spentMicros: number }[]) {
+  const days = new Map<string, { day: string; requests: number; units: number; spentMicros: number; simulatedMicros: number }>()
+  for (const day of real) days.set(day.day, { day: day.day, requests: n(day.requests), units: n(day.units), spentMicros: n(day.spentMicros), simulatedMicros: 0 })
   for (const day of simulated) {
-    const entry = days.get(day.day) ?? { day: day.day, requests: 0, tokens: 0, spentMicros: 0, simulatedMicros: 0 }
+    const entry = days.get(day.day) ?? { day: day.day, requests: 0, units: 0, spentMicros: 0, simulatedMicros: 0 }
     entry.simulatedMicros = n(day.spentMicros)
     days.set(day.day, entry)
   }

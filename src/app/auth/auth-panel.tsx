@@ -36,10 +36,10 @@ export function AuthPanel() {
       <div className="flex min-w-0 flex-col gap-(--space-md) lg:pt-(--space-xl)">
         <h1 className="max-w-[16ch] text-(length:--text-display-s) leading-[1.05]">An API key, then your first call.</h1>
         <p className="max-w-[44ch] leading-relaxed">
-          Create an account with a username, buy credits through Stripe Checkout, and call <code className="rounded-[4px] bg-(--color-paper-2) px-1.5 py-0.5 text-[0.875em]">/v1/chat/completions</code> with any OpenAI
-          SDK.
+          Create an account with a username, buy credits through Stripe Checkout, and send text to <code className="rounded-[4px] bg-(--color-paper-2) px-1.5 py-0.5 text-[0.875em]">/v1/moderate</code>. Each item comes
+          back allowed, held for review or blocked.
         </p>
-        <p className="max-w-[44ch] text-sm text-muted-foreground">The demo account is shared with everyone trying Tollbooth, and limited to two generations a day.</p>
+        <p className="max-w-[44ch] text-sm text-muted-foreground">The demo account is shared with everyone trying Bouncer, and limited to two moderation requests a day.</p>
       </div>
       <AuthForm
         identifier="username"

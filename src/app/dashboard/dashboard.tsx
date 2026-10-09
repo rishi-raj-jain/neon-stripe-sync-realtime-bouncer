@@ -5,29 +5,37 @@ import { ApiKeyList, type ApiKey } from '@/components/api-key-list/api-key-list'
 import { ConsumptionChart } from '@/components/consumption-chart/consumption-chart'
 import { LogsViewer } from '@/components/logs-viewer/logs-viewer'
 import { MetricCard } from '@/components/metric-card/metric-card'
-import { ModelSelect } from '@/components/model-select/model-select'
 import { CodeCard } from '@/components/site/code-card'
-import { ThinkingSelect, type ThinkingEffort } from '@/components/thinking-select/thinking-select'
 import { Badge } from '@/components/ui/badge'
-import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Message, MessageGroup } from '@/components/ui/message'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { UpgradeDialog } from '@/components/upgrade-dialog/upgrade-dialog'
 import type { Dashboard as DashboardData } from '@/lib/billing'
 import { cents, money } from '@/lib/format'
-import { CREDIT_PACKS, DEFAULT_MODEL, TOPUP_AMOUNTS_CENTS, TOPUP_THRESHOLDS_CENTS, usd, type PackId } from '@/shared/pricing'
+import {
+  CREDIT_PACKS,
+  MAX_CHARS_PER_ITEM,
+  MAX_ITEMS_PER_REQUEST,
+  MODERATION_CATEGORIES,
+  TOPUP_AMOUNTS_CENTS,
+  TOPUP_THRESHOLDS_CENTS,
+  unitsFor,
+  usd,
+  type ModerationCategory,
+  type ModerationVerdict,
+  type PackId,
+} from '@/shared/pricing'
 import { DashboardSidebar, isView, MobileNav, VIEWS, type View } from '@/app/dashboard/sidebar'
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-const LAST_KEY = 'tollbooth:last-key'
-const BASELINE_KEY = 'tollbooth:purchased-before-checkout'
+const LAST_KEY = 'bouncer:last-key'
+const BASELINE_KEY = 'bouncer:purchased-before-checkout'
 /** Orders sync as Checkout Session creates, which can lag up to 10 minutes during the preview. */
 const SYNC_PATIENCE_MS = 10 * 60_000
 
@@ -78,7 +86,7 @@ export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout, name }: {
     return () => clearInterval(timer)
   }, [awaitingPayment, refresh])
 
-  const requestTrend = useMemo(() => data.usage.daily.map((day) => ({ label: day.day.slice(5), value: day.requests })), [data.usage.daily])
+  const itemTrend = useMemo(() => data.usage.daily.map((day) => ({ label: day.day.slice(5), value: day.units })), [data.usage.daily])
   const spent30d = data.usage.daily.reduce((total, day) => total + day.spentMicros + day.simulatedMicros, 0)
   const simulated30d = data.usage.daily.reduce((total, day) => total + day.simulatedMicros, 0)
 
@@ -107,7 +115,7 @@ export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout, name }: {
           <header className="flex items-end justify-between gap-4 border-b pb-(--space-lg)">
             <div className="flex min-w-0 flex-col gap-1">
               <p className="font-mono text-xs text-muted-foreground">
-                Your API <span aria-hidden>/</span> {name}
+                Your account <span aria-hidden>/</span> {name}
               </p>
               <h1 className="text-[1.75rem] leading-tight">{VIEWS[view].label}</h1>
               <p className="text-sm text-muted-foreground">{VIEWS[view].description}</p>
@@ -125,7 +133,7 @@ export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout, name }: {
               <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 [&>*]:min-h-[120px] md:[&>*]:min-h-[168px] [&>*:first-child]:col-span-2 md:[&>*:first-child]:col-span-1">
                 {balanceCard}
                 <MetricCard label="30-day spend" value={usd(spent30d)} format="currency" comparisonLabel={simulated30d > 0 ? `incl. ${money(simulated30d)} simulated` : 'from the usage ledger'} />
-                <MetricCard label="30-day requests" value={data.usage.daily.reduce((total, day) => total + day.requests, 0)} trend={requestTrend.length > 1 ? requestTrend : undefined} />
+                <MetricCard label="30-day items checked" value={data.usage.daily.reduce((total, day) => total + day.units, 0)} trend={itemTrend.length > 1 ? itemTrend : undefined} />
               </div>
               <SpendChart data={data} />
             </>
@@ -148,7 +156,7 @@ export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout, name }: {
           )}
           {view === 'keys' && <Keys data={data} onChange={refresh} onError={setError} />}
           {view === 'quickstart' && <Quickstart apiBaseUrl={apiBaseUrl} />}
-          {view === 'playground' && <Playground apiBaseUrl={apiBaseUrl} limit={data.limit} onCalled={() => refresh().catch(() => {})} />}
+          {view === 'playground' && <Playground apiBaseUrl={apiBaseUrl} limit={data.limit} unitPriceMicros={data.pricing.unitPriceMicros} onCalled={() => refresh().catch(() => {})} />}
         </div>
       </div>
     </div>
@@ -207,7 +215,14 @@ function Credits({ data, onError }: { data: DashboardData; onError: (message: st
             name: pack.label,
             price: pack.cents / 100,
             period: 'one-time',
-            features: [`${cents(pack.cents)} of API credit`, `Billed per token on ${DEFAULT_MODEL}`, 'Works with auto top-up', 'Never expires'],
+            features: [
+              `${cents(pack.cents)} of moderation credit`,
+              data.pricing.unitPriceMicros > 0
+                ? `About ${Math.floor((pack.cents * 10_000) / data.pricing.unitPriceMicros).toLocaleString('en-US')} items at ${money(data.pricing.unitPriceMicros)} each`
+                : 'Billed per item checked',
+              'Works with auto top-up',
+              'Never expires',
+            ],
             action: 'Continue to Checkout',
             working: 'Opening Checkout…',
           }}
@@ -225,7 +240,7 @@ function SpendChart({ data }: { data: DashboardData }) {
     <ConsumptionChart
       title="Spend per day"
       data={points}
-      series={[{ id: 'spend', label: 'API calls' }, ...(hasSimulated ? [{ id: 'simulated', label: 'Simulated' }] : [])]}
+      series={[{ id: 'spend', label: 'Moderation' }, ...(hasSimulated ? [{ id: 'simulated', label: 'Simulated' }] : [])]}
       stacked
       variant="bar"
       formatValue={(value) => money(value * 1_000_000)}
@@ -395,7 +410,7 @@ function AutoTopup({ data, onSaved, onError }: { data: DashboardData; onSaved: (
         <div className="flex flex-col gap-2.5 rounded-md border border-dashed px-3 py-3">
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-medium">Try it without spending</span>
-            <span className="text-xs text-muted-foreground">Simulated usage takes credits off your balance with no AI Gateway call, so it costs nothing. It doesn&apos;t count toward the daily limit.</span>
+            <span className="text-xs text-muted-foreground">Simulated usage takes credits off your balance with no moderation behind it, so it costs nothing. It doesn&apos;t count toward the daily limit.</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" disabled={simulating !== null || data.wallet.balanceMicros <= 0} onClick={() => simulate('1', { kind: 'amount', cents: 100 })}>
@@ -478,35 +493,39 @@ function Keys({ data, onChange, onError }: { data: DashboardData; onChange: () =
 function Quickstart({ apiBaseUrl }: { apiBaseUrl: string }) {
   const base = apiBaseUrl || 'https://<your-api>'
   const snippets = {
-    curl: `curl ${base}/v1/chat/completions \\
-  -H "Authorization: Bearer $TOLLBOOTH_API_KEY" \\
+    curl: `curl ${base}/v1/moderate \\
+  -H "Authorization: Bearer $BOUNCER_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"model": "${DEFAULT_MODEL}", "messages": [{"role": "user", "content": "Hello!"}]}'`,
-    node: `import OpenAI from 'openai'
+  -d '{"input": ["Great write-up, thanks!", "You are an idiot."]}'`,
+    node: `const response = await fetch('${base}/v1/moderate', {
+  method: 'POST',
+  headers: { Authorization: \`Bearer \${process.env.BOUNCER_API_KEY}\`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ input: ['Great write-up, thanks!', 'You are an idiot.'] }),
+})
+const { results } = await response.json()
+// results[i].verdict: 'allow' | 'review' | 'block'`,
+    python: `import os, requests
 
-const client = new OpenAI({ baseURL: '${base}/v1', apiKey: process.env.TOLLBOOTH_API_KEY })
-const reply = await client.chat.completions.create({
-  model: '${DEFAULT_MODEL}',
-  messages: [{ role: 'user', content: 'Hello!' }],
-})`,
-    python: `from openai import OpenAI
-
-client = OpenAI(base_url="${base}/v1", api_key=os.environ["TOLLBOOTH_API_KEY"])
-reply = client.chat.completions.create(
-    model="${DEFAULT_MODEL}",
-    messages=[{"role": "user", "content": "Hello!"}],
-)`,
+response = requests.post(
+    "${base}/v1/moderate",
+    headers={"Authorization": f"Bearer {os.environ['BOUNCER_API_KEY']}"},
+    json={"input": ["Great write-up, thanks!", "You are an idiot."]},
+)
+for result in response.json()["results"]:
+    print(result["verdict"], result["flagged"])`,
   }
   return (
     <Card>
       <CardHeader>
         <CardTitle>Quickstart</CardTitle>
-        <CardDescription>OpenAI-compatible: point any OpenAI SDK at this base URL with your key. Every request is answered by {DEFAULT_MODEL}.</CardDescription>
+        <CardDescription>
+          Send up to {MAX_ITEMS_PER_REQUEST} texts per request. Each comes back as allow, review or block, with a score per category and a short reason. You pay per item, and only for results that pass validation.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex min-w-0 flex-col gap-1.5 text-sm sm:flex-row sm:items-center sm:gap-3">
-          <span className="shrink-0 text-muted-foreground">Base URL</span>
-          <code className="min-w-0 truncate rounded bg-muted px-2 py-1 font-mono text-xs">{apiBaseUrl ? `${apiBaseUrl}/v1` : 'Deploy the api function first (npx neon deploy)'}</code>
+          <span className="shrink-0 text-muted-foreground">Endpoint</span>
+          <code className="min-w-0 truncate rounded bg-muted px-2 py-1 font-mono text-xs">{apiBaseUrl ? `POST ${apiBaseUrl}/v1/moderate` : 'Deploy the api function first (npx neon deploy)'}</code>
         </div>
         <Tabs defaultValue="curl" className="min-w-0">
           <TabsList>
@@ -525,18 +544,16 @@ reply = client.chat.completions.create(
   )
 }
 
-type PlaygroundResult = { prompt: string; text: string; inputTokens: number; outputTokens: number; reasoningTokens: number; chargeUsd: string | null; ms: number }
+type ModerationResult = { verdict: ModerationVerdict; flagged: ModerationCategory[]; scores: Record<ModerationCategory, number>; reason: string }
+type PlaygroundResult = { items: string[]; results: ModerationResult[]; units: number; chargeUsd: string | null; ms: number }
 
-/** gpt-oss accepts low, medium and high; the selector's extra steps map to the nearest one. */
-const EFFORT: Record<ThinkingEffort, string> = { off: 'low', low: 'low', medium: 'medium', high: 'high', xhigh: 'high', max: 'high' }
+const SAMPLE_ITEMS = ['Thanks for the detailed write-up, this fixed my build.', 'You are a complete idiot and everyone here is sick of you.', 'Earn $5,000 a week from home!!! DM me for the link'].join('\n')
 
-/** The one model we sell. The API answers every request with it. */
-const MODELS = [{ id: DEFAULT_MODEL, name: DEFAULT_MODEL, provider: 'openai', reasoning: true, tag: 'cheapest' }]
+const VERDICT_BADGE: Record<ModerationVerdict, 'outline' | 'secondary' | 'destructive'> = { allow: 'outline', review: 'secondary', block: 'destructive' }
 
-function Playground({ apiBaseUrl, limit, onCalled }: { apiBaseUrl: string; limit: DashboardData['limit']; onCalled: () => void }) {
+function Playground({ apiBaseUrl, limit, unitPriceMicros, onCalled }: { apiBaseUrl: string; limit: DashboardData['limit']; unitPriceMicros: number; onCalled: () => void }) {
   const [key, setKey] = useState('')
-  const [prompt, setPrompt] = useState('In two sentences: why do prepaid API credits beat monthly invoices for a small AI startup?')
-  const [effort, setEffort] = useState<ThinkingEffort>('low')
+  const [text, setText] = useState(SAMPLE_ITEMS)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<PlaygroundResult | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -548,29 +565,33 @@ function Playground({ apiBaseUrl, limit, onCalled }: { apiBaseUrl: string; limit
     return () => window.removeEventListener(LAST_KEY, load)
   }, [])
 
+  // One item per non-empty line, the way the API counts them.
+  const items = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const units = items.reduce((total, item) => total + unitsFor(item), 0)
+  const invalid =
+    items.length > MAX_ITEMS_PER_REQUEST
+      ? `At most ${MAX_ITEMS_PER_REQUEST} items per request.`
+      : items.some((item) => item.length > MAX_CHARS_PER_ITEM)
+        ? `Each item can be at most ${MAX_CHARS_PER_ITEM} characters.`
+        : null
+
   async function send(event: React.FormEvent) {
     event.preventDefault()
     setBusy(true)
     setFailure(null)
     const startedAt = performance.now()
     try {
-      const response = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
+      const response = await fetch(`${apiBaseUrl}/v1/moderate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${key.trim()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: DEFAULT_MODEL, messages: [{ role: 'user', content: prompt }], reasoning_effort: EFFORT[effort] }),
+        body: JSON.stringify({ input: items }),
       })
       const body = await response.json()
       if (!response.ok) throw new Error(body.error?.message ?? `Request failed (${response.status})`)
-      setResult({
-        prompt,
-        text: body.choices?.[0]?.message?.content ?? '',
-        inputTokens: body.usage?.prompt_tokens ?? 0,
-        outputTokens: body.usage?.completion_tokens ?? 0,
-        // Reported by GPT-5 models; for gpt-oss the API estimates it and returns it in a header.
-        reasoningTokens: body.usage?.completion_tokens_details?.reasoning_tokens ?? Number(response.headers.get('x-tollbooth-reasoning-tokens') ?? 0),
-        chargeUsd: response.headers.get('x-tollbooth-charge-usd'),
-        ms: Math.round(performance.now() - startedAt),
-      })
+      setResult({ items, results: body.results ?? [], units: body.usage?.units ?? units, chargeUsd: response.headers.get('x-bouncer-charge-usd'), ms: Math.round(performance.now() - startedAt) })
       onCalled()
     } catch (e) {
       setFailure((e as Error).message)
@@ -583,71 +604,75 @@ function Playground({ apiBaseUrl, limit, onCalled }: { apiBaseUrl: string; limit
     <Card id="playground" className="scroll-mt-20">
       <CardHeader>
         <CardTitle>Playground</CardTitle>
-        <CardDescription>
-          Calls your API from the browser with your key, like any customer would. Turn reasoning up and watch the hidden tokens (and the charge) grow. This demo allows {limit.perDay} generations per account per day.
-        </CardDescription>
+        <CardDescription>Moderates text from the browser with your key, like any customer would, and bills the same way: per item. This demo allows {limit.perDay} requests per account per day.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={send} className="flex flex-col gap-4">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto]">
-            <div className="flex min-w-0 flex-col gap-2">
-              <Label htmlFor="playground-key">API key</Label>
-              <Input id="playground-key" type="password" placeholder="tb_… (create one under API keys)" value={key} onChange={(event) => setKey(event.target.value)} autoComplete="off" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Model</Label>
-              <ModelSelect models={MODELS} value={DEFAULT_MODEL} className="w-full md:w-56" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Reasoning</Label>
-              <ThinkingSelect value={effort} onValueChange={setEffort} size="md" className="w-full md:w-auto" />
-            </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <Label htmlFor="playground-key">API key</Label>
+            <Input id="playground-key" type="password" placeholder="bnc_… (create one under API keys)" value={key} onChange={(event) => setKey(event.target.value)} autoComplete="off" />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="playground-prompt">Prompt</Label>
+            <Label htmlFor="playground-items">Items, one per line</Label>
             <textarea
-              id="playground-prompt"
-              rows={3}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+              id="playground-items"
+              rows={4}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
             />
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-muted-foreground">
-              {DEFAULT_MODEL} via Neon AI Gateway · reasoning_effort: {EFFORT[effort]} ·{' '}
+              {invalid ? (
+                <span className="text-destructive">{invalid}</span>
+              ) : (
+                <>
+                  {items.length} {items.length === 1 ? 'item' : 'items'} · {units} {units === 1 ? 'unit' : 'units'}
+                  {unitPriceMicros > 0 && <> · {money(units * unitPriceMicros)}</>}
+                </>
+              )}{' '}
+              ·{' '}
               <span className={limit.remaining === 0 ? 'text-destructive' : undefined}>
-                {limit.remaining} of {limit.perDay} generations left today
+                {limit.remaining} of {limit.perDay} requests left today
               </span>
               {limit.remaining === 0 && limit.nextSlotAt && (
                 // Local time differs between server and browser; the browser's rendering wins.
                 <span suppressHydrationWarning> · next at {new Date(limit.nextSlotAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
               )}
             </span>
-            <Button type="submit" className="w-full sm:w-auto" disabled={busy || !key.trim() || !prompt.trim() || !apiBaseUrl || limit.remaining === 0}>
-              {busy ? 'Calling…' : 'Send'}
+            <Button type="submit" className="w-full sm:w-auto" disabled={busy || !key.trim() || items.length === 0 || Boolean(invalid) || !apiBaseUrl || limit.remaining === 0}>
+              {busy ? 'Checking…' : 'Check'}
             </Button>
           </div>
         </form>
         {failure && <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{failure}</p>}
         {result && (
           <div className="mt-4 flex flex-col gap-3 border-t pt-4">
-            <MessageGroup>
-              <Message align="end">
-                <Bubble align="end" variant="tinted">
-                  <BubbleContent className="whitespace-pre-wrap">{result.prompt}</BubbleContent>
-                </Bubble>
-              </Message>
-              <Message>
-                <Bubble variant="outline">
-                  <BubbleContent className="whitespace-pre-wrap">{result.text || <span className="text-muted-foreground">(empty answer: the output budget went to reasoning)</span>}</BubbleContent>
-                </Bubble>
-              </Message>
-            </MessageGroup>
+            <ul className="flex flex-col divide-y rounded-md border">
+              {result.results.map((item, index) => {
+                const top = MODERATION_CATEGORIES.reduce((best, category) => (item.scores[category] > item.scores[best] ? category : best), MODERATION_CATEGORIES[0])
+                return (
+                  <li key={index} className="flex flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-start sm:gap-3">
+                    <Badge variant={VERDICT_BADGE[item.verdict]} className="w-16 shrink-0 uppercase">
+                      {item.verdict}
+                    </Badge>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <p className="text-sm break-words">{result.items[index]}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.flagged.length > 0
+                          ? item.flagged.map((category) => `${category.replace('_', ' ')} ${item.scores[category].toFixed(2)}`).join(' · ')
+                          : `highest: ${top.replace('_', ' ')} ${item.scores[top].toFixed(2)}`}
+                        {item.reason && <> · {item.reason}</>}
+                      </p>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Badge variant="outline">{result.inputTokens} in</Badge>
-              <Badge variant="outline">{result.outputTokens - result.reasoningTokens} visible out</Badge>
-              <Badge variant="outline">~{result.reasoningTokens} reasoning</Badge>
+              <Badge variant="outline">{result.items.length} items</Badge>
+              <Badge variant="outline">{result.units} units</Badge>
               {result.chargeUsd && <Badge>charged ${Number(result.chargeUsd).toFixed(6)}</Badge>}
               <Badge variant="secondary">{result.ms} ms</Badge>
             </div>
@@ -658,7 +683,7 @@ function Playground({ apiBaseUrl, limit, onCalled }: { apiBaseUrl: string; limit
   )
 }
 
-/** The usage ledger, one line per billed call, in the Neon UI logs viewer. */
+/** The usage ledger, one line per request, in the Neon UI logs viewer. */
 function Recent({ data }: { data: DashboardData }) {
   const lines = data.usage.recent
     .slice()
@@ -667,11 +692,15 @@ function Recent({ data }: { data: DashboardData }) {
       id: event.id,
       at: event.createdAt,
       timestamp: new Date(event.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      level: event.simulated ? ('warn' as const) : ('info' as const),
-      source: event.model,
+      level: event.simulated ? ('warn' as const) : event.status >= 400 ? ('error' as const) : ('info' as const),
+      source: event.service,
       message: event.simulated
-        ? `simulated usage · ${money(event.priceMicros)} · no AI Gateway call`
-        : `${event.inputTokens} in · ${event.outputTokens - event.reasoningTokens} out · ${event.reasoningTokens} reasoning · ${money(event.priceMicros)}${event.latencyMs ? ` · ${event.latencyMs} ms` : ''}`,
+        ? `simulated usage · ${money(event.priceMicros)} · no moderation behind it`
+        : event.service !== 'moderate'
+          ? `earlier API call · ${money(event.priceMicros)}`
+          : event.status >= 400
+            ? `scoring failed · not charged${event.latencyMs ? ` · ${event.latencyMs} ms` : ''}`
+            : `${event.units} ${event.units === 1 ? 'unit' : 'units'} · ${money(event.priceMicros)}${event.latencyMs ? ` · ${event.latencyMs} ms` : ''}`,
     }))
   return (
     <div id="requests" className="min-w-0 scroll-mt-20">

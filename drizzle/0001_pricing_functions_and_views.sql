@@ -66,7 +66,7 @@ CREATE VIEW app.balances AS
       join stripe.invoices inv on inv.customer = a.stripe_customer_id
      where inv.status = 'paid'
        and inv.total = 0
-       and inv.metadata ->> 'app' = 'tollbooth'
+       and inv.metadata ->> 'app' = 'bouncer'
      group by a.id
   ),
   spent as (

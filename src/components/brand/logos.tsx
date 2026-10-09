@@ -12,22 +12,25 @@ function Svg({ title, children, ...props }: IconProps & { viewBox: string }) {
 }
 
 /**
- * Tollbooth mark: a toll gate. A post with a striped barrier arm, and the token that lifts it.
- * One color (currentColor), so it themes with the UI.
+ * Bouncer mark: a velvet rope between two stanchions, the line every item waits behind.
+ * One color (currentColor), so it themes with the UI; the rope is the lighter half.
  */
+const POSTS =
+  'M6 3a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5ZM4.5 8h3v17h-3V8ZM2 26.5A1.5 1.5 0 0 1 3.5 25h5a1.5 1.5 0 0 1 1.5 1.5V29H2v-2.5ZM26 3a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5ZM24.5 8h3v17h-3V8ZM22 26.5a1.5 1.5 0 0 1 1.5-1.5h5a1.5 1.5 0 0 1 1.5 1.5V29h-8v-2.5Z'
+const ROPE = 'M7.5 10Q16 22 24.5 10v3.5Q16 25.5 7.5 13.5V10Z'
+
 export function AppLogo(props: IconProps) {
   return (
     <Svg viewBox="0 0 32 32" {...props}>
-      <path d="M5 8.5A2.5 2.5 0 0 1 7.5 6h1A2.5 2.5 0 0 1 11 8.5V26H5V8.5ZM3 26.5A1.5 1.5 0 0 1 4.5 25h7a1.5 1.5 0 0 1 1.5 1.5V29H3v-2.5Z" />
-      <path d="M12.5 9.5h5v4h-5v-4Zm7 0h4v4h-4v-4Zm6 0h1.5a2 2 0 1 1 0 4h-1.5v-4Z" />
-      <circle cx="22" cy="22.5" r="5" opacity="0.55" />
+      <path d={POSTS} />
+      <path d={ROPE} opacity="0.55" />
     </Svg>
   )
 }
 
 /** Path data for <NeonLoader mark={APP_LOADER_MARK} /> so the loader animates our mark. */
 export const APP_LOADER_MARK = {
-  path: 'M5 8.5A2.5 2.5 0 0 1 7.5 6h1A2.5 2.5 0 0 1 11 8.5V26H5V8.5ZM12.5 9.5h5v4h-5v-4Zm7 0h4v4h-4v-4Zm6 0h1.5a2 2 0 1 1 0 4h-1.5v-4Z',
+  path: `${POSTS}${ROPE}`,
   width: 32,
   height: 32,
 }

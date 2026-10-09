@@ -41,7 +41,7 @@ export type AuthFormProps = Omit<ComponentProps<'form'>, 'onSubmit'> & {
   /** Server-side verdicts pinned to fields (e.g. incorrect password). */
   fieldErrors?: Partial<Record<AuthFieldName, string>>
   /**
-   * Per-field validators merged over the mode defaults — return the
+   * Per-field validators merged over the mode defaults, return the
    * failure message, or null when the value passes. Use it to bring
    * your own password policy.
    */
@@ -62,12 +62,12 @@ export type AuthFormProps = Omit<ComponentProps<'form'>, 'onSubmit'> & {
   /**
    * What the identifier field asks for. "username" relabels the email field (text input,
    * username autocomplete and validator); values still arrive as `values.email`.
-   * (Tollbooth addition.)
+   * (Bouncer addition.)
    */
   identifier?: 'email' | 'username'
   /**
    * Content between the header and the fields, e.g. a "Try the demo account" button and an
-   * "or" divider. Hidden on the sent face. (Tollbooth addition.)
+   * "or" divider. Hidden on the sent face. (Bouncer addition.)
    */
   lead?: ReactNode
   /** Brand mark slot above the title. */
@@ -75,7 +75,7 @@ export type AuthFormProps = Omit<ComponentProps<'form'>, 'onSubmit'> & {
   title?: string
   description?: string
   /**
-   * "card" (default) draws the house surface — border, bg-card,
+   * "card" (default) draws the house surface, border, bg-card,
    * padding. "bare" renders naked for split layouts that supply
    * their own panel.
    */
@@ -87,7 +87,7 @@ export type AuthFormProps = Omit<ComponentProps<'form'>, 'onSubmit'> & {
  *
  * Read top-to-bottom. Each value is ms after mount; every
  * group rises 8px and fades in over 500ms, fields one at a
- * time — the form introduces itself in reading order.
+ * time, the form introduces itself in reading order.
  * Static under reduced motion.
  *
  *    0ms   mark, title, description
@@ -111,7 +111,7 @@ const TIMING: Record<'header' | 'fields' | 'fieldStagger' | 'action' | 'meta', n
 const RISE = 'fill-mode-backwards fade-in-0 slide-in-from-bottom-2 animate-in duration-500 motion-reduce:animate-none'
 
 /* ─────────────────────────────────────────────────────────
- * FIELD STORYBOARD — "light in a tube"
+ * FIELD STORYBOARD: "light in a tube"
  *
  * The frame stays neutral; the light does the talking.
  *
@@ -120,18 +120,18 @@ const RISE = 'fill-mode-backwards fade-in-0 slide-in-from-bottom-2 animate-in du
  *           transform-only) and the label warms to
  *           foreground
  *  blur     the beam withdraws; a filled field validates on
- *           leave — never while you're still typing, and
+ *           leave, never while you're still typing, and
  *           never for a field you merely tabbed past
  *           (required verdicts wait for submit)
- *  invalid  the whole box takes the verdict — destructive
- *           border and a whisper of destructive fill — the
+ *  invalid  the whole box takes the verdict, destructive
+ *           border and a whisper of destructive fill, the
  *           message takes over the label slot in place
- *           (crossfade, no layout shift — the frame never
+ *           (crossfade, no layout shift, the frame never
  *           moves), and an X draws itself into the field
  *           edge
  *  valid    a check draws itself into the field edge,
  *           stroke first to last (300ms ease-out)
- *  edit     any verdict clears instantly — the system
+ *  edit     any verdict clears instantly, the system
  *           responds, it doesn't linger
  *  submit   all fields judged at once; the first failure
  *           takes focus; onSubmit fires only on a clean
@@ -141,13 +141,13 @@ const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)'
 
 const EMAIL_SHAPE = /^\S+@\S+\.\S+$/u
 
-/* Better Auth's server defaults — client verdicts agree with them. */
+/* Better Auth's server defaults, client verdicts agree with them. */
 const MIN_PASSWORD = 8
 const MAX_PASSWORD = 128
 
 const USERNAME_SHAPE = /^[a-zA-Z0-9_.-]{3,30}$/
 
-/** Username: 3–30 letters, numbers, dots, dashes or underscores. (Tollbooth addition.) */
+/** Username: 3–30 letters, numbers, dots, dashes or underscores. (Bouncer addition.) */
 export const validateUsername = (value: string): string | null => {
   if (!value) {
     return 'Add your username.'
@@ -207,17 +207,17 @@ const COPY: Record<AuthMode, { title: string; description: string; action: strin
 }
 
 /* ─────────────────────────────────────────────────────────
- * ACTION STORYBOARD — "ignition"
+ * ACTION STORYBOARD: "ignition"
  *
- *  dormant  ghost: hairline border, muted label — the form
+ *  dormant  ghost: hairline border, muted label, the form
  *           hasn't earned the color yet
  *  charged  every visible field has content: the action
  *           fills to neon on a 300ms ramp and a soft
  *           primary glow blooms
- *  press    scale 0.98, 160ms — the interface is listening
+ *  press    scale 0.98, 160ms, the interface is listening
  *  busy     the working label shimmers under lock
  * ───────────────────────────────────────────────────────── */
-/* The charged CTA speaks through color and the sweep alone — no glow. */
+/* The charged CTA speaks through color and the sweep alone, no glow. */
 const CTA_GLOW = ''
 
 const AuthFormHeader = ({ description, error, mark, title }: { description: string; error: string | null; mark?: ReactNode; title: string }) => (
@@ -228,7 +228,7 @@ const AuthFormHeader = ({ description, error, mark, title }: { description: stri
       </span>
     ) : null}
     <h2 className="text-xl font-semibold tracking-tight text-balance text-foreground">{title}</h2>
-    {/* The form's voice: normally the pitch, on failure the verdict —
+    {/* The form's voice: normally the pitch, on failure the verdict,
         swapped in place so the frame never moves. */}
     <p
       className={cn('animate-in text-sm text-pretty duration-200 fade-in-0 motion-reduce:animate-none', error ? 'text-destructive' : 'text-muted-foreground')}
@@ -318,12 +318,12 @@ const AuthFormMeta = ({
 )
 
 /* ─────────────────────────────────────────────────────────
- * STRENGTH STORYBOARD — sign-up password only
+ * STRENGTH STORYBOARD: sign-up password only
  *
  * The beam doubles as the meter: its reach grows with the
  * password and its color warms from destructive through
  * neutral to primary. The word ("weak" / "fair" / "strong")
- * rides the trailing slot — nothing changes height.
+ * rides the trailing slot, nothing changes height.
  * Scoring matches Better Auth's defaults (8–128 chars) as
  * the floor, then rewards mixed case, digits, symbols, and
  * length.
@@ -390,7 +390,7 @@ const passwordRequirements = (value: string): PasswordRequirement[] => [
   { label: 'a symbol', met: /[^a-zA-Z0-9]/u.test(value) },
 ]
 
-/** Null when empty — the meter only speaks once you've started. */
+/** Null when empty, the meter only speaks once you've started. */
 const strengthMeter = (value: string): StrengthMeter | null => {
   if (!value) {
     return null
@@ -430,7 +430,7 @@ const beamTone = (error: string | null | undefined, meter: StrengthMeter | null 
  *
  * Portaled to the body and pinned to the input's rect (fixed
  * position, re-measured on scroll and resize), so it floats
- * above every sibling — no stacking context, not even the
+ * above every sibling, no stacking context, not even the
  * charged CTA, can paint over it. Each rule flips
  * from a muted dot to a drawn primary check as the password
  * satisfies it. Floating, so nothing in the form shifts.
@@ -485,7 +485,7 @@ const RequirementsPopover = ({ anchor, requirements }: { anchor: { current: HTML
   )
 }
 
-/* The field frame stays neutral in every state — the beam under the
+/* The field frame stays neutral in every state, the beam under the
  * input and the label carry the verdict. */
 const FIELD_INPUT =
   'w-full rounded-md border border-border/60 bg-transparent px-3 py-2 text-base caret-primary sm:text-sm outline-none transition-colors placeholder:text-muted-foreground/60 hover:border-border focus:border-border disabled:cursor-not-allowed disabled:opacity-60'
@@ -546,7 +546,7 @@ const AuthField = ({
 
   return (
     <label className={cn('group flex flex-col gap-1.5', RISE)} data-invalid={error ? true : undefined} data-slot="auth-form-field" style={{ animationDelay: `${delay}ms` }}>
-      {/* The label slot: the verdict takes it over in place — same
+      {/* The label slot: the verdict takes it over in place, same
           row, same height, zero layout shift. */}
       <span className="flex items-baseline justify-between">
         <span
@@ -571,7 +571,7 @@ const AuthField = ({
             FIELD_INPUT,
             (valid || error) && 'pr-9',
             // An invalid verdict tints the whole box, not just an
-            // underline — border and a whisper of fill.
+            // underline, border and a whisper of fill.
             error && 'border-destructive/60 bg-destructive/[0.04] hover:border-destructive/70 focus:border-destructive/70',
           )}
           disabled={disabled}
@@ -794,7 +794,7 @@ export const AuthForm = ({
   const judge = (field: AuthFieldName, value: string) => {
     const check = rules[field]
 
-    // Skipping past an empty field isn't a mistake yet — required
+    // Skipping past an empty field isn't a mistake yet, required
     // verdicts wait for submit.
     if (!(check && value)) {
       return
@@ -877,7 +877,7 @@ export const AuthForm = ({
         </div>
       ) : null}
 
-      {/* The confirmation face: the fields yield — the form's work is
+      {/* The confirmation face: the fields yield, the form's work is
           done, the inbox's begins. */}
       {sent ? <ResetSentFace isBusy={isBusy} onResend={onResend} /> : null}
 

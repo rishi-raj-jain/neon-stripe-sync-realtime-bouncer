@@ -3,7 +3,7 @@
 import { signOut } from '@/app/auth/actions'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { ChartLine, ChevronDown, Code, CreditCard, KeyRound, LayoutGrid, LogOut, MessageSquare, PanelLeftClose, PanelLeftOpen, Plug, RefreshCw, type LucideIcon } from 'lucide-react'
+import { ChartLine, ChevronDown, Code, CreditCard, KeyRound, LayoutGrid, LogOut, PanelLeftClose, PanelLeftOpen, Plug, RefreshCw, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 /**
@@ -11,13 +11,13 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
  * top-level pages, then one expandable group.
  */
 export const VIEWS = {
-  overview: { label: 'Overview', icon: LayoutGrid, description: 'Balance, spend and requests at a glance.' },
-  usage: { label: 'Usage', icon: ChartLine, description: 'Every billed call and every simulated spend, newest first.' },
+  overview: { label: 'Overview', icon: LayoutGrid, description: 'Balance, spend and items checked at a glance.' },
+  usage: { label: 'Usage', icon: ChartLine, description: 'Every moderation request and every simulated spend, newest first.' },
   billing: { label: 'Billing', icon: CreditCard, description: 'Credit packs and every purchase, synced from Stripe into Postgres.' },
   'auto-topup': { label: 'Auto top-up', icon: RefreshCw, description: 'Refill the balance automatically, or on demand, with a Stripe invoice.' },
   keys: { label: 'API keys', icon: KeyRound, description: 'Bearer keys for the API. Only a SHA-256 of each is stored.' },
-  quickstart: { label: 'Quickstart', icon: Code, description: 'Call the API from curl, Node or Python.' },
-  playground: { label: 'Playground', icon: MessageSquare, description: 'Call your API from the browser, metered like any customer.' },
+  quickstart: { label: 'Quickstart', icon: Code, description: 'Moderate text from curl, Node or Python.' },
+  playground: { label: 'Playground', icon: ShieldCheck, description: 'Moderate sample text from the browser, billed like any customer.' },
 } satisfies Record<string, { label: string; icon: LucideIcon; description: string }>
 
 export type View = keyof typeof VIEWS
@@ -27,7 +27,7 @@ export const isView = (value: string | null): value is View => value !== null &&
 const TOP: View[] = ['overview', 'usage', 'billing', 'auto-topup']
 const API: View[] = ['keys', 'quickstart', 'playground']
 
-const COLLAPSED_KEY = 'tollbooth:sidebar-collapsed'
+const COLLAPSED_KEY = 'bouncer:sidebar-collapsed'
 
 /** Desktop and tablet: a sticky sidebar. Tablet always shows the icon rail; desktop can collapse to it. */
 export function DashboardSidebar({ view, onNavigate, name, balance }: { view: View; onNavigate: (view: View) => void; name: string; balance: ReactNode }) {
@@ -65,7 +65,7 @@ export function DashboardSidebar({ view, onNavigate, name, balance }: { view: Vi
         <div className="flex flex-col gap-3 p-3">
           {!rail && (
             <div className="flex flex-col gap-0.5 rounded-(--radius-control) border px-3 py-2">
-              <span className="text-xs text-muted-foreground">Your API</span>
+              <span className="text-xs text-muted-foreground">Your account</span>
               <span className="truncate text-sm font-medium text-(--color-ink)">{name}</span>
             </div>
           )}

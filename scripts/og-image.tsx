@@ -30,7 +30,7 @@ const card = (
         <AppLogo className="mark" />
         {SITE.name}
       </div>
-      <h1>Sell an LLM API by the token.</h1>
+      <h1>Content moderation, billed per item.</h1>
       <div className="chips">
         <span className="chip">
           <NeonLogo className="neon" />
@@ -45,18 +45,15 @@ const card = (
     </div>
     <figure className="code">
       <figcaption>
-        <span>POST /v1/chat/completions</span>
+        <span>POST /v1/moderate</span>
         <span className="ok">200 OK</span>
       </figcaption>
       <pre>
-        <span className="k">&quot;usage&quot;</span>: {'{'}
-        {'\n  '}
-        <span className="k">&quot;prompt_tokens&quot;</span>: 107,{'\n  '}
-        <span className="k">&quot;completion_tokens&quot;</span>: 274,{'\n  '}
-        <span className="k">&quot;cached_tokens&quot;</span>: 32{'\n'}
-        {'}'}
+        <span className="k">&quot;verdict&quot;</span>: &quot;block&quot;,{'\n'}
+        <span className="k">&quot;flagged&quot;</span>: [&quot;harassment&quot;],{'\n'}
+        <span className="k">&quot;reason&quot;</span>: &quot;Harassing insult.&quot;{'\n'}
         {'\n'}
-        <span className="dim">{'// gpt-oss-20b · 3-word answer'}</span>
+        <span className="dim">{'// $0.001 per item'}</span>
       </pre>
     </figure>
   </main>

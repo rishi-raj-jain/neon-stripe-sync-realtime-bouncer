@@ -1,4 +1,4 @@
-# Design — Tollbooth
+# Design: Bouncer
 
 A locked design system for this app, produced by `hallmark redesign`. Every page reads this
 file before changing its look. Do not regenerate per page: amend this file when the system
@@ -22,7 +22,7 @@ modern-minimal (an API product for developers and the people who bill them).
   (`?view=…`). Tablets get the icon rail; phones a sticky, scrollable strip under the nav.
 - Auth (`/auth`): a two-column diptych, copy left, the Neon UI auth form right.
 
-## Theme — Cobalt, dark (amended: the owner asked for dark mode)
+## Theme: Cobalt, dark (amended: the owner asked for dark mode)
 
 - `--color-paper` oklch(15.5% 0.012 258) graphite, never #000
 - `--color-surface` oklch(18.5% 0.013 258) cards (raised = lighter)
@@ -43,7 +43,7 @@ green, Stripe blurple) at icon size only.
 ## Components
 
 ui.neon.com first, re-themed only through tokens.css: metric cards, consumption chart, activity
-feed, API key list, model + thinking selects, message bubbles, logs viewer, upgrade dialog, auth
+feed, API key list, logs viewer, upgrade dialog, auth
 form, tabs, switch, select. Hand-built only where Neon UI has nothing: the ⌘K palette (on the Neon dialog) and code cards.
 
 ## Typography
