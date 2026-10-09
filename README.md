@@ -50,6 +50,11 @@ on **Neon**, with no Stripe webhooks anywhere.
   threshold and creates a Stripe invoice for the top-up with the promotion code (finalizing a $0
   invoice marks it paid; idempotency keys per 15-minute window). The invoice syncs back and the
   balance view counts it. A failure switches auto top-up off, with the reason in the dashboard.
+- **Simulated usage, to demo auto top-up for free.** The dashboard's auto top-up card has
+  "Use $1", "Use $5" and "Drop below threshold". They insert rows into `app.simulated_spend` (no
+  AI Gateway call, no cost); `app.balances` subtracts them like real usage, so the `topups`
+  function refills the balance on its next run. Simulated spend never counts toward the daily
+  limit, never takes a balance below zero, and shows as its own series in the chart and ledger.
 - **Two generations per account per day.** A demo guard against abuse (`DAILY_REQUEST_LIMIT`),
   checked in the same query as the key and balance. Once used up: `429` with `Retry-After`.
 
@@ -75,12 +80,13 @@ curl "$API_BASE_URL/v1/chat/completions" \
 
 Dashboard routes (Next.js, session cookie):
 
-| Route                         | Method      | What it does                                                   |
-| ----------------------------- | ----------- | -------------------------------------------------------------- |
-| `/api/checkout`               | POST        | `{ pack }` → Stripe Checkout URL (saves the card)              |
-| `/api/account`                | GET         | balance, card on file, purchases, keys, usage (one round trip) |
-| `/api/account/auto-topup`     | PUT         | `{ enabled, thresholdCents, amountCents }`                     |
-| `/api/keys`, `/api/keys/[id]` | POST/DELETE | create (plaintext returned once, SHA-256 stored) / revoke      |
+| Route                         | Method      | What it does                                                                                      |
+| ----------------------------- | ----------- | ------------------------------------------------------------------------------------------------- |
+| `/api/checkout`               | POST        | `{ pack }` → Stripe Checkout URL (saves the card)                                                 |
+| `/api/account`                | GET         | balance, card on file, purchases, keys, usage (one round trip)                                    |
+| `/api/account/auto-topup`     | PUT         | `{ enabled, thresholdCents, amountCents }`                                                        |
+| `/api/usage/simulate`         | POST        | `{ kind: 'amount', cents }` or `{ kind: 'below-threshold' }`: simulated usage, no AI Gateway call |
+| `/api/keys`, `/api/keys/[id]` | POST/DELETE | create (plaintext returned once, SHA-256 stored) / revoke                                         |
 
 ## Setup
 

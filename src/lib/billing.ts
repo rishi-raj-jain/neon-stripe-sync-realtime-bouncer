@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { db } from '@/db/client'
-import { accounts, apiKeys, balances, topups, usageEvents, type Account } from '@/db/schema/app'
+import { accounts, apiKeys, balances, simulatedSpend, topups, usageEvents, type Account } from '@/db/schema/app'
 import { stripeCharges, stripeCheckoutSessions, stripeInvoices } from '@/db/schema/stripe'
 import { AUTO_PROMOTION_CODE, DAILY_REQUEST_LIMIT } from '@/shared/pricing'
 import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
@@ -100,6 +100,26 @@ const dailyQuery = (accountId: string) =>
     .groupBy(sql`1`)
     .orderBy(sql`1`)
 
+/** Simulated usage per day (no AI Gateway call behind it), shown as its own series. */
+const simulatedDailyQuery = (accountId: string) =>
+  db
+    .select({
+      day: sql<string>`to_char(date_trunc('day', ${simulatedSpend.createdAt}), 'YYYY-MM-DD')`,
+      spentMicros: sql<number>`sum(${simulatedSpend.amountMicros})::bigint`,
+    })
+    .from(simulatedSpend)
+    .where(and(eq(simulatedSpend.accountId, accountId), gt(simulatedSpend.createdAt, sql`now() - interval '30 days'`)))
+    .groupBy(sql`1`)
+    .orderBy(sql`1`)
+
+const simulatedRecentQuery = (accountId: string) =>
+  db
+    .select({ id: simulatedSpend.id, amountMicros: simulatedSpend.amountMicros, createdAt: simulatedSpend.createdAt })
+    .from(simulatedSpend)
+    .where(eq(simulatedSpend.accountId, accountId))
+    .orderBy(desc(simulatedSpend.createdAt))
+    .limit(15)
+
 /** The demo's daily limit: billed calls in the last 24 hours, and when the oldest ages out. */
 const limitQuery = (accountId: string) =>
   db
@@ -129,7 +149,7 @@ const n = (value: unknown) => Number(value ?? 0)
 export async function getDashboard(account: Account) {
   // Without a Stripe customer there are no charges; query an id that can't match.
   const customerId = account.stripeCustomerId ?? ''
-  const [[balance], charges, freeOrders, freeInvoices, recentTopups, keys, daily, recent, [today]] = await db.batch([
+  const [[balance], charges, freeOrders, freeInvoices, recentTopups, keys, daily, recent, [today], simulatedDaily, simulatedRecent] = await db.batch([
     balanceQuery(account.id),
     chargesQuery(customerId),
     freeOrdersQuery(customerId),
@@ -139,6 +159,8 @@ export async function getDashboard(account: Account) {
     dailyQuery(account.id),
     recentQuery(account.id),
     limitQuery(account.id),
+    simulatedDailyQuery(account.id),
+    simulatedRecentQuery(account.id),
   ])
 
   // The card on file: whatever the latest successful charge was paid with (saved off-session).
@@ -193,8 +215,24 @@ export async function getDashboard(account: Account) {
     },
     keys: keys.map((key) => ({ ...key, createdAt: key.createdAt.toISOString(), lastUsedAt: key.lastUsedAt?.toISOString() ?? null })),
     usage: {
-      daily: daily.map((day) => ({ day: day.day, requests: n(day.requests), tokens: n(day.tokens), spentMicros: n(day.spentMicros) })),
-      recent: recent.map((event) => ({ ...event, priceMicros: n(event.priceMicros), createdAt: event.createdAt.toISOString() })),
+      daily: mergeDaily(daily, simulatedDaily),
+      // Real calls and simulated usage, newest first.
+      recent: [
+        ...recent.map((event) => ({ ...event, priceMicros: n(event.priceMicros), simulated: false, createdAt: event.createdAt.toISOString() })),
+        ...simulatedRecent.map((entry) => ({
+          id: entry.id,
+          model: 'simulated',
+          inputTokens: 0,
+          outputTokens: 0,
+          reasoningTokens: 0,
+          priceMicros: n(entry.amountMicros),
+          latencyMs: null,
+          simulated: true,
+          createdAt: entry.createdAt.toISOString(),
+        })),
+      ]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, 15),
     },
   }
 }
@@ -212,4 +250,37 @@ export async function updateAutoTopup(accountId: string, settings: { enabled: bo
       ...(settings.enabled && { autoTopupError: null }),
     })
     .where(eq(accounts.id, accountId))
+}
+
+/** One row per day with real and simulated spend side by side. */
+function mergeDaily(real: { day: string; requests: number; tokens: number; spentMicros: number }[], simulated: { day: string; spentMicros: number }[]) {
+  const days = new Map<string, { day: string; requests: number; tokens: number; spentMicros: number; simulatedMicros: number }>()
+  for (const day of real) days.set(day.day, { day: day.day, requests: n(day.requests), tokens: n(day.tokens), spentMicros: n(day.spentMicros), simulatedMicros: 0 })
+  for (const day of simulated) {
+    const entry = days.get(day.day) ?? { day: day.day, requests: 0, tokens: 0, spentMicros: 0, simulatedMicros: 0 }
+    entry.simulatedMicros = n(day.spentMicros)
+    days.set(day.day, entry)
+  }
+  return [...days.values()].sort((a, b) => a.day.localeCompare(b.day))
+}
+
+export type SimulateMode = { kind: 'amount'; cents: number } | { kind: 'below-threshold' }
+
+/**
+ * Simulated usage: spend credits on paper (no AI Gateway call, no cost) so the balance drops and
+ * auto top-up can be demonstrated. One statement reads the balance, works out the amount and
+ * caps it at the balance (never below zero). Returns the micros spent (0 when nothing to do).
+ */
+export async function simulateSpend(accountId: string, mode: SimulateMode): Promise<number> {
+  // 'below-threshold' lands one cent under the auto top-up threshold.
+  const requested = mode.kind === 'amount' ? sql`${mode.cents * 10_000}::bigint` : sql`(b.balance_micros - a.auto_topup_threshold_micros + 10000)`
+  const result = await db.execute(sql`
+    insert into app.simulated_spend (account_id, amount_micros)
+    select a.id, least(${requested}, b.balance_micros)
+      from app.accounts a
+      join app.balances b on b.account_id = a.id
+     where a.id = ${accountId}
+       and least(${requested}, b.balance_micros) > 0
+    returning amount_micros`)
+  return n((result.rows[0] as { amount_micros?: string } | undefined)?.amount_micros)
 }

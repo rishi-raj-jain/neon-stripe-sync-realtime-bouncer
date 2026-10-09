@@ -68,7 +68,8 @@ export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout }: { initi
   }, [awaitingPayment, refresh])
 
   const requestTrend = useMemo(() => data.usage.daily.map((day) => ({ label: day.day.slice(5), value: day.requests })), [data.usage.daily])
-  const spent30d = data.usage.daily.reduce((total, day) => total + day.spentMicros, 0)
+  const spent30d = data.usage.daily.reduce((total, day) => total + day.spentMicros + day.simulatedMicros, 0)
+  const simulated30d = data.usage.daily.reduce((total, day) => total + day.simulatedMicros, 0)
 
   return (
     <div className="flex flex-col gap-6">
@@ -83,7 +84,7 @@ export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout }: { initi
           format="currency"
           comparisonLabel={awaitingPayment ? 'waiting for your payment to sync…' : `${money(data.wallet.purchasedMicros)} bought · ${money(data.wallet.spentMicros)} used`}
         />
-        <MetricCard label="30-day spend" value={usd(spent30d)} format="currency" comparisonLabel="from the usage ledger" />
+        <MetricCard label="30-day spend" value={usd(spent30d)} format="currency" comparisonLabel={simulated30d > 0 ? `incl. ${money(simulated30d)} simulated` : 'from the usage ledger'} />
         <MetricCard label="30-day requests" value={data.usage.daily.reduce((total, day) => total + day.requests, 0)} trend={requestTrend.length > 1 ? requestTrend : undefined} />
       </div>
 
@@ -167,12 +168,14 @@ function Credits({ data, onError }: { data: DashboardData; onError: (message: st
 
 /** Spend per day from the usage ledger (Neon UI consumption chart). */
 function SpendChart({ data }: { data: DashboardData }) {
-  const points = data.usage.daily.map((day) => ({ label: day.day.slice(5), values: { spend: usd(day.spentMicros) } }))
+  const points = data.usage.daily.map((day) => ({ label: day.day.slice(5), values: { spend: usd(day.spentMicros), simulated: usd(day.simulatedMicros) } }))
+  const hasSimulated = data.usage.daily.some((day) => day.simulatedMicros > 0)
   return (
     <ConsumptionChart
       title="Spend per day"
       data={points}
-      series={[{ id: 'spend', label: 'Spend' }]}
+      series={[{ id: 'spend', label: 'API calls' }, ...(hasSimulated ? [{ id: 'simulated', label: 'Simulated' }] : [])]}
+      stacked
       variant="bar"
       formatValue={(value) => money(value * 1_000_000)}
       meteredThrough="the usage ledger"
@@ -208,9 +211,49 @@ function Purchases({ data }: { data: DashboardData }) {
   )
 }
 
-function AutoTopup({ data, onSaved, onError }: { data: DashboardData; onSaved: () => Promise<unknown>; onError: (message: string | null) => void }) {
+/** How long to keep watching for a top-up after simulated usage (the cron runs every 5 minutes). */
+const TOPUP_WATCH_MS = 7 * 60_000
+
+function AutoTopup({ data, onSaved, onError }: { data: DashboardData; onSaved: () => Promise<DashboardData>; onError: (message: string | null) => void }) {
   const [settings, setSettings] = useState({ enabled: data.autoTopup.enabled, thresholdCents: data.autoTopup.thresholdCents, amountCents: data.autoTopup.amountCents })
   const [saving, setSaving] = useState(false)
+  const [simulating, setSimulating] = useState<string | null>(null)
+  // Set while waiting for the `topups` function: the purchased total to beat, and when we started.
+  const [watch, setWatch] = useState<{ baseline: number; since: number } | null>(null)
+  const [toppedUp, setToppedUp] = useState(false)
+
+  const thresholdMicros = data.autoTopup.thresholdCents * 10_000
+  const belowThreshold = data.wallet.balanceMicros < thresholdMicros
+
+  // After simulated usage takes the balance under the threshold, poll until the top-up lands.
+  useEffect(() => {
+    if (!watch) return
+    const timer = setInterval(async () => {
+      const next = await onSaved().catch(() => null)
+      if (next && next.wallet.purchasedMicros > watch.baseline) {
+        setToppedUp(true)
+        setWatch(null)
+      } else if (Date.now() - watch.since > TOPUP_WATCH_MS) {
+        setWatch(null)
+      }
+    }, 10_000)
+    return () => clearInterval(timer)
+  }, [watch, onSaved])
+
+  async function simulate(key: string, body: object) {
+    onError(null)
+    setToppedUp(false)
+    setSimulating(key)
+    try {
+      await api('/api/usage/simulate', { method: 'POST', body: JSON.stringify(body) })
+      const next = await onSaved()
+      if (next.autoTopup.enabled && next.wallet.balanceMicros < next.autoTopup.thresholdCents * 10_000) setWatch({ baseline: next.wallet.purchasedMicros, since: Date.now() })
+    } catch (e) {
+      onError((e as Error).message)
+    } finally {
+      setSimulating(null)
+    }
+  }
   const dirty = settings.enabled !== data.autoTopup.enabled || settings.thresholdCents !== data.autoTopup.thresholdCents || settings.amountCents !== data.autoTopup.amountCents
 
   async function save() {
@@ -218,7 +261,9 @@ function AutoTopup({ data, onSaved, onError }: { data: DashboardData; onSaved: (
     setSaving(true)
     try {
       await api('/api/account/auto-topup', { method: 'PUT', body: JSON.stringify(settings) })
-      await onSaved()
+      const next = await onSaved()
+      // Turned on while already under the threshold: the next cron run tops up, so watch for it.
+      if (next.autoTopup.enabled && next.wallet.balanceMicros < next.autoTopup.thresholdCents * 10_000) setWatch({ baseline: next.wallet.purchasedMicros, since: Date.now() })
     } catch (e) {
       onError((e as Error).message)
     } finally {
@@ -274,6 +319,32 @@ function AutoTopup({ data, onSaved, onError }: { data: DashboardData; onSaved: (
           </div>
         </div>
         {data.autoTopup.error && <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">Switched off: {data.autoTopup.error}</p>}
+        <div className="flex flex-col gap-2.5 rounded-md border border-dashed px-3 py-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">Try it without spending</span>
+            <span className="text-xs text-muted-foreground">Simulated usage takes credits off your balance with no AI Gateway call, so it costs nothing. It doesn&apos;t count toward the daily limit.</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={simulating !== null || data.wallet.balanceMicros <= 0} onClick={() => simulate('1', { kind: 'amount', cents: 100 })}>
+              {simulating === '1' ? 'Using…' : 'Use $1'}
+            </Button>
+            <Button size="sm" variant="outline" disabled={simulating !== null || data.wallet.balanceMicros <= 0} onClick={() => simulate('5', { kind: 'amount', cents: 500 })}>
+              {simulating === '5' ? 'Using…' : 'Use $5'}
+            </Button>
+            <Button size="sm" variant="outline" disabled={simulating !== null || belowThreshold} onClick={() => simulate('below', { kind: 'below-threshold' })}>
+              {simulating === 'below' ? 'Using…' : `Drop below ${cents(data.autoTopup.thresholdCents)}`}
+            </Button>
+          </div>
+          {watch && (
+            <p className="text-xs text-(--color-ink-2)">
+              Balance is under {cents(data.autoTopup.thresholdCents)}. The next run of the topups function (every 5 minutes) adds {cents(data.autoTopup.amountCents)}; watching for it…
+            </p>
+          )}
+          {!watch && belowThreshold && !data.autoTopup.enabled && data.wallet.balanceMicros >= 0 && (
+            <p className="text-xs text-muted-foreground">Balance is under the threshold. Turn on auto top-up and save to see it refill.</p>
+          )}
+          {toppedUp && <p className="text-xs text-primary">Topped up: the invoice synced from Stripe and the balance view counted it.</p>}
+        </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground">
             {data.autoTopup.recent[0] ? `Last: ${cents(data.autoTopup.recent[0].amountCents)} ${data.autoTopup.recent[0].status}, ${when(data.autoTopup.recent[0].createdAt)}` : 'No automatic top-ups yet.'}
@@ -511,9 +582,11 @@ function Recent({ data }: { data: DashboardData }) {
       id: event.id,
       at: event.createdAt,
       timestamp: new Date(event.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      level: 'info' as const,
+      level: event.simulated ? ('warn' as const) : ('info' as const),
       source: event.model,
-      message: `${event.inputTokens} in · ${event.outputTokens - event.reasoningTokens} out · ${event.reasoningTokens} reasoning · ${money(event.priceMicros)}${event.latencyMs ? ` · ${event.latencyMs} ms` : ''}`,
+      message: event.simulated
+        ? `simulated usage · ${money(event.priceMicros)} · no AI Gateway call`
+        : `${event.inputTokens} in · ${event.outputTokens - event.reasoningTokens} out · ${event.reasoningTokens} reasoning · ${money(event.priceMicros)}${event.latencyMs ? ` · ${event.latencyMs} ms` : ''}`,
     }))
   return (
     <div id="requests" className="min-w-0 scroll-mt-20">

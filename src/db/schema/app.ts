@@ -107,6 +107,24 @@ export const usageEvents = app.table(
   ],
 )
 
+/**
+ * Simulated usage: credits spent on paper, with no AI Gateway call behind them. Lets you drain a
+ * balance to demonstrate auto top-up without paying for tokens. app.balances subtracts it like
+ * real usage; it never counts toward the daily generation limit and carries no cost.
+ */
+export const simulatedSpend = app.table(
+  'simulated_spend',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    amountMicros: bigint('amount_micros', { mode: 'number' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('simulated_spend_account_created_idx').on(t.accountId, t.createdAt), check('simulated_spend_amount_check', sql`${t.amountMicros} > 0`)],
+)
+
 /** Auto top-ups started by the `topups` function: one Stripe invoice each (it syncs into stripe.invoices). */
 export const topups = app.table(
   'topups',
