@@ -1,0 +1,175 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+/* Neon UI theme tokens (ui.neon.com) and the shadcn token mapping… */
+@import '../components/tokens.css';
+/* …re-themed by the locked Cobalt system (design.md). Imported after, so it wins. */
+@import '../../tokens.css';
+
+/* Hallmark · genre: modern-minimal · macrostructure: Split Studio (marketing) / Workbench (app) · theme: Cobalt · nav: N13 · footer: Ft5 · design-system: design.md · designed-as-app */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-display);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --color-paper: var(--color-paper);
+  --color-paper-2: var(--color-paper-2);
+  --color-rule: var(--color-rule);
+  --color-ink: var(--color-ink);
+  --color-ink-2: var(--color-ink-2);
+  --color-signal: var(--color-accent);
+  --color-graphite: var(--color-graphite);
+  --color-band: var(--color-band);
+  --color-graphite-2: var(--color-graphite-2);
+  --color-graphite-rule: var(--color-graphite-rule);
+  --color-graphite-ink: var(--color-graphite-ink);
+  --color-graphite-muted: var(--color-graphite-muted);
+  --color-signal-on-dark: var(--color-signal-on-dark);
+  --color-danger: var(--color-danger);
+  --color-danger-wash: var(--color-danger-wash);
+  --color-accent-wash: var(--color-accent-wash);
+
+  --ease-out: var(--ease-out);
+  --ease-in: var(--ease-in);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  /* No horizontal scroll at any width; clip (not hidden) keeps sticky working. */
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply bg-background antialiased;
+    color: var(--color-ink-2);
+    font-weight: 400;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    color: var(--color-ink);
+    font-weight: 700;
+    font-style: normal;
+    letter-spacing: -0.025em;
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+
+  code,
+  kbd,
+  pre {
+    font-family: var(--font-mono);
+  }
+
+  ::selection {
+    background: var(--color-accent-wash);
+    color: var(--color-ink);
+  }
+
+  /* Focus shows instantly, never animated in. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Tailwind v4 resets buttons to cursor: default. Everything clickable gets a pointer;
+     disabled controls show not-allowed instead. */
+  a[href],
+  button,
+  [role='button'],
+  select,
+  summary,
+  label:has(> input, > select),
+  input[type='file'],
+  input[type='file']::file-selector-button,
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='submit'] {
+    cursor: pointer;
+  }
+
+  :disabled,
+  [aria-disabled='true'],
+  :disabled::file-selector-button {
+    cursor: not-allowed;
+  }
+}
+
+@layer components {
+  /* Machine-readout labels: Google Sans Code, uppercase, open tracking. */
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  /* The content column every page and section shares. */
+  .page-frame {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: var(--space-md);
+  }
+  @media (min-width: 40rem) {
+    .page-frame {
+      padding-inline: var(--space-lg);
+    }
+  }
+
+  /* Typographic link: underline grows in cobalt on hover. */
+  .link-type {
+    color: var(--color-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--color-rule-2);
+    text-underline-offset: 4px;
+    transition: text-decoration-color var(--dur-short) var(--ease-out);
+  }
+  .link-type:hover {
+    text-decoration-color: var(--color-accent);
+  }
+
+  /* Reveal once on scroll (IntersectionObserver adds .is-in). */
+  .reveal {
+    opacity: 0;
+    transform: translateY(10px);
+    transition:
+      opacity 600ms var(--ease-out),
+      transform 600ms var(--ease-out);
+  }
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 150ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 150ms !important;
+  }
+}

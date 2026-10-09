@@ -1,0 +1,25 @@
+[
+  {
+    "date": "2026-10-09",
+    "scope": "app",
+    "genre": "modern-minimal",
+    "macrostructure": "Split Studio (marketing) · Workbench (app)",
+    "theme": "Cobalt (dark variant)",
+    "theme_axes": "dark / geometric-sans (Google Sans) / cool",
+    "enrichment": "none",
+    "nav": "N13",
+    "footer": "Ft5",
+    "brief": "Amendment: dark mode, Google Sans everywhere, maximum ui.neon.com components, responsive pass"
+  },
+  {
+    "date": "2026-10-09",
+    "scope": "app",
+    "genre": "modern-minimal",
+    "macrostructure": "Split Studio (marketing) · Workbench (app)",
+    "theme": "Cobalt",
+    "enrichment": "none (code card is content, not decoration)",
+    "nav": "N13 inline ⌘K (bordered, working palette)",
+    "footer": "Ft5 Statement",
+    "brief": "Tollbooth · metered LLM API reseller on Neon + Stripe; redesigned to differ from Headshot Studio (dark · Google Sans · neon green)"
+  }
+]

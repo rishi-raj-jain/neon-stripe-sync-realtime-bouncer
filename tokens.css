@@ -1,0 +1,129 @@
+/* Hallmark · genre: modern-minimal · theme: Cobalt · design-system: design.md · designed-as-app
+ * dark · paper oklch(15.5% 0.012 258) · accent oklch(70% 0.16 256) electric cobalt · Google Sans + Google Sans Code
+ * axes: dark / geometric-sans (Google Sans) / cool
+ */
+
+/* The locked system (see design.md). Everything below reads these by name. Dark only: the
+   <html> carries .dark so Neon UI's dark: variants apply too. */
+:root {
+  color-scheme: dark;
+  /* Dark Cobalt. Paper → ink, all tinted toward the cobalt anchor (hue ~255). Never #000 / #fff.
+     Raised surfaces are lighter than the paper, never darker. */
+  --color-paper: oklch(15.5% 0.012 258);
+  --color-paper-2: oklch(20% 0.014 258);
+  --color-surface: oklch(18.5% 0.013 258);
+  --color-rule: oklch(28.5% 0.016 258);
+  --color-rule-2: oklch(36% 0.018 258);
+  --color-neutral: oklch(60% 0.014 257);
+  --color-muted: oklch(71% 0.012 257);
+  --color-ink-2: oklch(84% 0.01 255);
+  --color-ink: oklch(95.5% 0.006 255);
+
+  /* The one signal, lifted for the dark ground (≥ 5:1 on paper as text and behind dark text).
+     Under 5% of any view: primary button, focus, active nav, links on hover, 200 OK. */
+  --color-accent: oklch(70% 0.16 256);
+  --color-accent-ink: oklch(15.5% 0.012 258);
+  --color-accent-wash: oklch(25% 0.05 256);
+  --color-focus: oklch(74% 0.14 256);
+
+  /* Code cards sit in a deeper well; the page's one band is a raised panel. */
+  --color-graphite: oklch(11.5% 0.012 260);
+  --color-graphite-2: oklch(14% 0.013 260);
+  --color-graphite-rule: oklch(26% 0.016 260);
+  --color-graphite-ink: oklch(92% 0.008 255);
+  --color-graphite-muted: oklch(66% 0.014 257);
+  --color-signal-on-dark: oklch(76% 0.13 256);
+  --color-band: oklch(19.5% 0.015 258);
+
+  /* Functional only: money lost, destructive actions. */
+  --color-danger: oklch(70% 0.16 25);
+  --color-danger-wash: oklch(24% 0.05 25);
+
+  /* Type: display + body + mono (mono is the code / figures register). */
+  --font-display: var(--font-google-sans), 'Google Sans', ui-sans-serif, sans-serif;
+  --font-body: var(--font-google-sans), 'Google Sans', ui-sans-serif, sans-serif;
+  --font-mono: var(--font-google-sans-code), 'Google Sans Code', ui-monospace, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.25rem;
+  --text-lg: 1.5625rem;
+  --text-xl: 1.9531rem;
+  --text-display-s: clamp(2.25rem, 3.5vw + 1rem, 3.75rem);
+  --text-display: clamp(2.5rem, 4.5vw + 1rem, 4.5rem);
+
+  /* 4-pt scale, named by role. */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+
+  --radius-control: 6px;
+  /* No shadows on the dark ground (they read as glow); hairlines carry depth. */
+  --shadow-whisper: none;
+  --radius-code: 10px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  /* ── Mapping onto the ui.neon.com / shadcn variables, so every Neon UI component
+     re-themes to Cobalt without being edited. ─────────────────────────────── */
+  --radius: var(--radius-control);
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-accent-ink);
+  --secondary: var(--color-paper-2);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-paper-2);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-paper-2);
+  --accent-foreground: var(--color-ink);
+  --destructive: var(--color-danger);
+  --destructive-foreground: var(--color-accent-ink);
+  --border: var(--color-rule);
+  --input: var(--color-rule-2);
+  --ring: var(--color-focus);
+
+  --status-active: var(--color-accent);
+  --status-sleeping: var(--color-neutral);
+  --status-scaling: oklch(62% 0.13 70);
+
+  /* Chart ramp: one hue, lightness steps (values tell bands apart, not hues). */
+  --chart-1: oklch(70% 0.16 256);
+  --chart-2: oklch(80% 0.1 254);
+  --chart-3: oklch(58% 0.17 258);
+  --chart-4: oklch(88% 0.05 252);
+  --chart-5: oklch(46% 0.13 260);
+
+  --sidebar: var(--color-surface);
+  --sidebar-foreground: var(--color-ink);
+  --sidebar-primary: var(--color-accent);
+  --sidebar-primary-foreground: var(--color-accent-ink);
+  --sidebar-accent: var(--color-paper-2);
+  --sidebar-accent-foreground: var(--color-ink);
+  --sidebar-border: var(--color-rule);
+  --sidebar-ring: var(--color-focus);
+}
