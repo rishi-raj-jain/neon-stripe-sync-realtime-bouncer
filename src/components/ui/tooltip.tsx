@@ -18,14 +18,16 @@ function TooltipTrigger(props: TooltipPrimitive.Trigger.Props) {
 
 function TooltipContent({
   className,
+  side,
   sideOffset = 6,
   ...props
 }: TooltipPrimitive.Popup.Props & {
+  side?: TooltipPrimitive.Positioner.Props['side']
   sideOffset?: TooltipPrimitive.Positioner.Props['sideOffset']
 }) {
   return (
     <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Positioner sideOffset={sideOffset}>
+      <TooltipPrimitive.Positioner side={side} sideOffset={sideOffset}>
         <TooltipPrimitive.Popup
           className={cn(
             'z-50 animate-in rounded-md border border-border/60 bg-popover px-2 py-1 font-mono text-[10px] text-popover-foreground shadow-md duration-150 fade-in-0 zoom-in-95 motion-reduce:animate-none',

@@ -36,8 +36,8 @@ export async function POST(request: Request) {
     // Free: the discount takes the total to $0 (no PaymentIntent). Paid: save the card for top-ups.
     ...(promotionCode ? { discounts: [{ promotion_code: promotionCode }] } : { payment_intent_data: { setup_future_usage: 'off_session' as const, metadata } }),
     metadata,
-    success_url: `${env.APP_URL}/dashboard?checkout=success`,
-    cancel_url: `${env.APP_URL}/dashboard?checkout=cancelled`,
+    success_url: `${env.APP_URL}/dashboard?view=billing&checkout=success`,
+    cancel_url: `${env.APP_URL}/dashboard?view=billing&checkout=cancelled`,
   })
   if (!session.url) return Response.json({ error: 'checkout unavailable' }, { status: 502 })
   return Response.json({ url: session.url })

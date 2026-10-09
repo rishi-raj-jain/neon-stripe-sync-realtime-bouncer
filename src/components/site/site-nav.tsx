@@ -33,7 +33,8 @@ export function SiteNav({ access }: { access: PaletteAccess }) {
 
   return (
     <header className="sticky top-0 z-(--z-sticky) border-b bg-(--color-paper)/92 backdrop-blur-sm">
-      <div className="page-frame flex h-14 items-center gap-4 sm:gap-6">
+      {/* The dashboard is a full-width app shell, so its bar lines the wordmark up with the sidebar. */}
+      <div className={cn('flex h-14 items-center gap-4 sm:gap-6', pathname.startsWith('/dashboard') ? 'w-full px-(--space-md) sm:px-(--space-lg) md:px-[1.375rem]' : 'page-frame')}>
         <Link href="/" className="flex shrink-0 items-center gap-2 font-heading text-[1.0625rem] font-bold tracking-tight whitespace-nowrap text-(--color-ink)">
           <AppLogo className="size-6" />
           {SITE.name}
@@ -73,7 +74,7 @@ export function SiteNav({ access }: { access: PaletteAccess }) {
             <GitHubIcon className="size-4" />
           </a>
           {access.signedIn ? (
-            <Link href="/dashboard#credits" className={cn(buttonVariants({ size: 'sm' }), 'h-9 rounded-[var(--radius-control)] px-3 whitespace-nowrap')}>
+            <Link href="/dashboard?view=billing" className={cn(buttonVariants({ size: 'sm' }), 'h-9 rounded-[var(--radius-control)] px-3 whitespace-nowrap')}>
               Buy credits
             </Link>
           ) : (

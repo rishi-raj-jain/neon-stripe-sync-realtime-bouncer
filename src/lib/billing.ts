@@ -1,9 +1,11 @@
 import 'server-only'
 
-import { db } from '@/db/client'
+import { db, sql as client } from '@/db/client'
 import { accounts, apiKeys, balances, simulatedSpend, topups, usageEvents, type Account } from '@/db/schema/app'
 import { stripeCharges, stripeCheckoutSessions, stripeInvoices } from '@/db/schema/stripe'
+import { stripe } from '@/lib/stripe'
 import { AUTO_PROMOTION_CODE, DAILY_REQUEST_LIMIT } from '@/shared/pricing'
+import { findTopupCandidates, manualTopupKey, topUp, topupPromotionId, type TopupResult } from '@/shared/topups'
 import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 
 /*
@@ -283,4 +285,16 @@ export async function simulateSpend(accountId: string, mode: SimulateMode): Prom
        and least(${requested}, b.balance_micros) > 0
     returning amount_micros`)
   return n((result.rows[0] as { amount_micros?: string } | undefined)?.amount_micros)
+}
+
+/**
+ * "Top up now": the same top-up the scheduled `topups` function runs, for one account, without
+ * waiting for the next 5-minute run. Null when there's nothing to do (balance at or above the
+ * threshold, or the last top-up hasn't synced back yet).
+ */
+export async function topUpNow(accountId: string): Promise<TopupResult | null> {
+  const [candidates, promotionCodeId] = await Promise.all([findTopupCandidates(client, { accountId }), topupPromotionId(client)])
+  const candidate = candidates[0]
+  if (!candidate) return null
+  return topUp(client, stripe, candidate, { promotionCodeId, key: manualTopupKey(candidate), manual: true })
 }

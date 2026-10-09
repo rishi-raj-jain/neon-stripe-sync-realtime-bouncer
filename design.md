@@ -15,7 +15,11 @@ modern-minimal (an API product for developers and the people who bill them).
 - Marketing (`/`): **Split Studio**. Every claim sits beside its proof, the pairing alternates
   sides down the page, and exactly one full-bleed raised band breaks the rhythm.
 - App (`/dashboard`): **Workbench**. Small functional headings, hairline
-  panels, mono labels, tabular figures. No hero, no enrichment.
+  panels, mono labels, tabular figures. No hero, no enrichment. (Amended: the owner asked for a
+  sidebar, after the Neon Console.) A full-width app shell: a sticky sidebar (name, a cobalt-tinted
+  balance row, Overview / Usage / Billing / Auto top-up, a divider, the expandable API group with
+  keys / quickstart / playground, then sign out and collapse at the foot) and one view at a time
+  (`?view=…`). Tablets get the icon rail; phones a sticky, scrollable strip under the nav.
 - Auth (`/auth`): a two-column diptych, copy left, the Neon UI auth form right.
 
 ## Theme — Cobalt, dark (amended: the owner asked for dark mode)

@@ -22,6 +22,8 @@ import { UpgradeDialog } from '@/components/upgrade-dialog/upgrade-dialog'
 import type { Dashboard as DashboardData } from '@/lib/billing'
 import { cents, money } from '@/lib/format'
 import { CREDIT_PACKS, DEFAULT_MODEL, TOPUP_AMOUNTS_CENTS, TOPUP_THRESHOLDS_CENTS, usd, type PackId } from '@/shared/pricing'
+import { DashboardSidebar, isView, MobileNav, VIEWS, type View } from '@/app/dashboard/sidebar'
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 const LAST_KEY = 'tollbooth:last-key'
@@ -39,8 +41,17 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 const when = (iso: string) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 
-export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout }: { initial: DashboardData; apiBaseUrl: string; returnedFromCheckout: boolean }) {
+export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout, name }: { initial: DashboardData; apiBaseUrl: string; returnedFromCheckout: boolean; name: string }) {
   const [data, setData] = useState(initial)
+  const searchParams = useSearchParams()
+  const requested = searchParams.get('view')
+  const view: View = isView(requested) ? requested : 'overview'
+
+  // Views are client-side: pushState keeps them in the URL (and the back button) without a reload.
+  const navigate = useCallback((next: View) => {
+    window.history.pushState(null, '', next === 'overview' ? '/dashboard' : `/dashboard?view=${next}`)
+    window.scrollTo({ top: 0 })
+  }, [])
   const [awaitingPayment, setAwaitingPayment] = useState(returnedFromCheckout)
   const [error, setError] = useState<string | null>(null)
 
@@ -61,7 +72,7 @@ export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout }: { initi
         clearInterval(timer)
         sessionStorage.removeItem(BASELINE_KEY)
         setAwaitingPayment(false)
-        window.history.replaceState(null, '', '/dashboard')
+        window.history.replaceState(null, '', '/dashboard?view=billing')
       }
     }, 2_500)
     return () => clearInterval(timer)
@@ -71,35 +82,75 @@ export function Dashboard({ initial, apiBaseUrl, returnedFromCheckout }: { initi
   const spent30d = data.usage.daily.reduce((total, day) => total + day.spentMicros + day.simulatedMicros, 0)
   const simulated30d = data.usage.daily.reduce((total, day) => total + day.simulatedMicros, 0)
 
+  const balance = (
+    <span className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
+      <span className="text-sm">Balance</span>
+      <span className="truncate font-mono text-sm tabular-nums">{awaitingPayment ? 'syncing…' : money(data.wallet.balanceMicros)}</span>
+    </span>
+  )
+  const balanceCard = (
+    <MetricCard
+      label="Balance"
+      value={usd(data.wallet.balanceMicros)}
+      format="currency"
+      comparisonLabel={awaitingPayment ? 'waiting for your payment to sync…' : `${money(data.wallet.purchasedMicros)} bought · ${money(data.wallet.spentMicros)} used`}
+    />
+  )
+
   return (
-    <div className="flex flex-col gap-6">
-      {error && <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+    <div className="flex w-full">
+      <DashboardSidebar view={view} onNavigate={navigate} name={name} balance={balance} />
+      <div className="min-w-0 flex-1">
+        <MobileNav view={view} onNavigate={navigate} />
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-(--space-md) py-(--space-xl) sm:px-(--space-lg)">
+          {/* Hallmark · macrostructure: Workbench (app) · theme: Cobalt · design-system: design.md · designed-as-app */}
+          <header className="flex items-end justify-between gap-4 border-b pb-(--space-lg)">
+            <div className="flex min-w-0 flex-col gap-1">
+              <p className="font-mono text-xs text-muted-foreground">
+                Your API <span aria-hidden>/</span> {name}
+              </p>
+              <h1 className="text-[1.75rem] leading-tight">{VIEWS[view].label}</h1>
+              <p className="text-sm text-muted-foreground">{VIEWS[view].description}</p>
+            </div>
+            <button type="button" onClick={() => navigate('billing')} className="shrink-0 rounded-(--radius-control) border px-2.5 py-1 font-mono text-xs tabular-nums md:hidden">
+              {money(data.wallet.balanceMicros)}
+            </button>
+          </header>
 
-      {/* Phones: balance full width, the two 30-day figures side by side; tablet and up: one row. */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 [&>*]:min-h-[120px] md:[&>*]:min-h-[168px]">
-        <MetricCard
-          className="col-span-2 md:col-span-1"
-          label="Balance"
-          value={usd(data.wallet.balanceMicros)}
-          format="currency"
-          comparisonLabel={awaitingPayment ? 'waiting for your payment to sync…' : `${money(data.wallet.purchasedMicros)} bought · ${money(data.wallet.spentMicros)} used`}
-        />
-        <MetricCard label="30-day spend" value={usd(spent30d)} format="currency" comparisonLabel={simulated30d > 0 ? `incl. ${money(simulated30d)} simulated` : 'from the usage ledger'} />
-        <MetricCard label="30-day requests" value={data.usage.daily.reduce((total, day) => total + day.requests, 0)} trend={requestTrend.length > 1 ? requestTrend : undefined} />
+          {error && <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+
+          {view === 'overview' && (
+            <>
+              {/* Phones: balance full width, the two 30-day figures side by side; tablet and up: one row. */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 [&>*]:min-h-[120px] md:[&>*]:min-h-[168px] [&>*:first-child]:col-span-2 md:[&>*:first-child]:col-span-1">
+                {balanceCard}
+                <MetricCard label="30-day spend" value={usd(spent30d)} format="currency" comparisonLabel={simulated30d > 0 ? `incl. ${money(simulated30d)} simulated` : 'from the usage ledger'} />
+                <MetricCard label="30-day requests" value={data.usage.daily.reduce((total, day) => total + day.requests, 0)} trend={requestTrend.length > 1 ? requestTrend : undefined} />
+              </div>
+              <SpendChart data={data} />
+            </>
+          )}
+          {view === 'usage' && <Recent data={data} />}
+          {view === 'billing' && (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+              <Credits data={data} onError={setError} />
+              <Purchases data={data} />
+            </div>
+          )}
+          {view === 'auto-topup' && (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+              <AutoTopup data={data} onSaved={refresh} onError={setError} />
+              <div className="flex flex-col gap-6 [&>*:first-child]:min-h-[140px]">
+                {balanceCard}
+                <Purchases data={data} />
+              </div>
+            </div>
+          )}
+          {view === 'keys' && <Keys data={data} onChange={refresh} onError={setError} />}
+          {view === 'quickstart' && <Quickstart apiBaseUrl={apiBaseUrl} />}
+          {view === 'playground' && <Playground apiBaseUrl={apiBaseUrl} limit={data.limit} onCalled={() => refresh().catch(() => {})} />}
+        </div>
       </div>
-
-      <SpendChart data={data} />
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Credits data={data} onError={setError} />
-        <AutoTopup data={data} onSaved={refresh} onError={setError} />
-      </div>
-      <Purchases data={data} />
-
-      <Keys data={data} onChange={refresh} onError={setError} />
-      <Quickstart apiBaseUrl={apiBaseUrl} />
-      <Playground apiBaseUrl={apiBaseUrl} limit={data.limit} onCalled={() => refresh().catch(() => {})} />
-      <Recent data={data} />
     </div>
   )
 }
@@ -211,15 +262,17 @@ function Purchases({ data }: { data: DashboardData }) {
   )
 }
 
-/** How long to keep watching for a top-up after simulated usage (the cron runs every 5 minutes). */
+/** How long to keep watching for a top-up after simulated usage (the cron runs every 5 minutes) or a manual run. */
 const TOPUP_WATCH_MS = 7 * 60_000
 
 function AutoTopup({ data, onSaved, onError }: { data: DashboardData; onSaved: () => Promise<DashboardData>; onError: (message: string | null) => void }) {
   const [settings, setSettings] = useState({ enabled: data.autoTopup.enabled, thresholdCents: data.autoTopup.thresholdCents, amountCents: data.autoTopup.amountCents })
   const [saving, setSaving] = useState(false)
   const [simulating, setSimulating] = useState<string | null>(null)
-  // Set while waiting for the `topups` function: the purchased total to beat, and when we started.
-  const [watch, setWatch] = useState<{ baseline: number; since: number } | null>(null)
+  const [running, setRunning] = useState(false)
+  // Set while waiting for a top-up to land: the purchased total to beat, when we started, and
+  // whether it's the scheduled `topups` run or a manual one (invoice already created).
+  const [watch, setWatch] = useState<{ baseline: number; since: number; manual: boolean } | null>(null)
   const [toppedUp, setToppedUp] = useState(false)
 
   const thresholdMicros = data.autoTopup.thresholdCents * 10_000
@@ -247,13 +300,33 @@ function AutoTopup({ data, onSaved, onError }: { data: DashboardData; onSaved: (
     try {
       await api('/api/usage/simulate', { method: 'POST', body: JSON.stringify(body) })
       const next = await onSaved()
-      if (next.autoTopup.enabled && next.wallet.balanceMicros < next.autoTopup.thresholdCents * 10_000) setWatch({ baseline: next.wallet.purchasedMicros, since: Date.now() })
+      if (next.autoTopup.enabled && next.wallet.balanceMicros < next.autoTopup.thresholdCents * 10_000) setWatch({ baseline: next.wallet.purchasedMicros, since: Date.now(), manual: false })
     } catch (e) {
       onError((e as Error).message)
     } finally {
       setSimulating(null)
     }
   }
+
+  // "Top up now": the same top-up as the scheduled run, for this account, right away.
+  async function runNow() {
+    onError(null)
+    setToppedUp(false)
+    setRunning(true)
+    const baseline = data.wallet.purchasedMicros
+    try {
+      await api('/api/account/auto-topup/run', { method: 'POST' })
+      const next = await onSaved()
+      if (next.wallet.purchasedMicros > baseline) setToppedUp(true)
+      else setWatch({ baseline, since: Date.now(), manual: true })
+    } catch (e) {
+      onError((e as Error).message)
+      await onSaved().catch(() => null)
+    } finally {
+      setRunning(false)
+    }
+  }
+
   const dirty = settings.enabled !== data.autoTopup.enabled || settings.thresholdCents !== data.autoTopup.thresholdCents || settings.amountCents !== data.autoTopup.amountCents
 
   async function save() {
@@ -263,7 +336,7 @@ function AutoTopup({ data, onSaved, onError }: { data: DashboardData; onSaved: (
       await api('/api/account/auto-topup', { method: 'PUT', body: JSON.stringify(settings) })
       const next = await onSaved()
       // Turned on while already under the threshold: the next cron run tops up, so watch for it.
-      if (next.autoTopup.enabled && next.wallet.balanceMicros < next.autoTopup.thresholdCents * 10_000) setWatch({ baseline: next.wallet.purchasedMicros, since: Date.now() })
+      if (next.autoTopup.enabled && next.wallet.balanceMicros < next.autoTopup.thresholdCents * 10_000) setWatch({ baseline: next.wallet.purchasedMicros, since: Date.now(), manual: false })
     } catch (e) {
       onError((e as Error).message)
     } finally {
@@ -335,19 +408,31 @@ function AutoTopup({ data, onSaved, onError }: { data: DashboardData; onSaved: (
               {simulating === 'below' ? 'Using…' : `Drop below ${cents(data.autoTopup.thresholdCents)}`}
             </Button>
           </div>
-          {watch && (
+          {watch && !watch.manual && (
             <p className="text-xs text-(--color-ink-2)">
-              Balance is under {cents(data.autoTopup.thresholdCents)}. The next run of the topups function (every 5 minutes) adds {cents(data.autoTopup.amountCents)}; watching for it…
+              Balance is under {cents(data.autoTopup.thresholdCents)}. The next run of the topups function (every 5 minutes) adds {cents(data.autoTopup.amountCents)}; watching for it, or top up now.
             </p>
           )}
+          {watch?.manual && <p className="text-xs text-(--color-ink-2)">Invoice created in Stripe. Waiting for it to sync back into Neon…</p>}
           {!watch && belowThreshold && !data.autoTopup.enabled && data.wallet.balanceMicros >= 0 && (
-            <p className="text-xs text-muted-foreground">Balance is under the threshold. Turn on auto top-up and save to see it refill.</p>
+            <p className="text-xs text-muted-foreground">Balance is under the threshold. Turn on auto top-up and save to see it refill, or top up now.</p>
           )}
           {toppedUp && <p className="text-xs text-primary">Topped up: the invoice synced from Stripe and the balance view counted it.</p>}
         </div>
+        <div className="flex flex-col gap-2.5 rounded-md border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">Run it now</span>
+            <span className="text-xs text-muted-foreground">
+              {belowThreshold ? 'Skip the 5-minute wait: the same top-up the function runs, for your account, right now.' : `Runs once your balance is under ${cents(data.autoTopup.thresholdCents)}.`}
+            </span>
+          </div>
+          <Button size="sm" variant="outline" className="self-start sm:self-auto" disabled={!data.autoTopup.available || !belowThreshold || running || Boolean(watch?.manual)} onClick={runNow}>
+            {running ? 'Topping up…' : `Top up ${cents(data.autoTopup.amountCents)} now`}
+          </Button>
+        </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground">
-            {data.autoTopup.recent[0] ? `Last: ${cents(data.autoTopup.recent[0].amountCents)} ${data.autoTopup.recent[0].status}, ${when(data.autoTopup.recent[0].createdAt)}` : 'No automatic top-ups yet.'}
+            {data.autoTopup.recent[0] ? `Last: ${cents(data.autoTopup.recent[0].amountCents)} ${data.autoTopup.recent[0].status}, ${when(data.autoTopup.recent[0].createdAt)}` : 'No top-ups yet.'}
           </span>
           <Button size="sm" disabled={!dirty || saving} onClick={save}>
             {saving ? 'Saving…' : 'Save'}
@@ -370,7 +455,7 @@ function Keys({ data, onChange, onError }: { data: DashboardData; onChange: () =
   async function create(name: string) {
     onError(null)
     const { key } = await api<{ key: string }>('/api/keys', { method: 'POST', body: JSON.stringify({ name }) })
-    // Kept for this tab only, so the playground below can use it. The server never has it again.
+    // Kept for this tab only, so the Playground view can use it. The server never has it again.
     sessionStorage.setItem(LAST_KEY, key)
     window.dispatchEvent(new Event(LAST_KEY))
     await onChange()
@@ -507,7 +592,7 @@ function Playground({ apiBaseUrl, limit, onCalled }: { apiBaseUrl: string; limit
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto]">
             <div className="flex min-w-0 flex-col gap-2">
               <Label htmlFor="playground-key">API key</Label>
-              <Input id="playground-key" type="password" placeholder="tb_… (create one above)" value={key} onChange={(event) => setKey(event.target.value)} autoComplete="off" />
+              <Input id="playground-key" type="password" placeholder="tb_… (create one under API keys)" value={key} onChange={(event) => setKey(event.target.value)} autoComplete="off" />
             </div>
             <div className="flex flex-col gap-2">
               <Label>Model</Label>
